@@ -72,6 +72,7 @@ cc_library {
     whole_static_libs: [
         "liblogwrap",
         "libdm",
+        "libext2_uuid",
         "libfstab",
     ],
     cppflags: [
