@@ -104,10 +104,10 @@ int load_verity_state(const android::fs_mgr::FstabEntry& entry, int* mode);
 bool fs_mgr_is_ext4(const std::string& blk_device);
 bool fs_mgr_is_f2fs(const std::string& blk_device);
 
-bool fs_mgr_teardown_verity(android::fs_mgr::FstabEntry* fstab, bool wait);
+bool fs_mgr_teardown_verity(android::fs_mgr::FstabEntry* fstab);
 
 namespace android {
 namespace fs_mgr {
-bool UnmapDevice(const std::string& name, const std::chrono::milliseconds& timeout_ms);
+bool UnmapDevice(const std::string& name);
 }  // namespace fs_mgr
 }  // namespace android
