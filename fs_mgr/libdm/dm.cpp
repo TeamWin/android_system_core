@@ -30,6 +30,8 @@
 #include <android-base/strings.h>
 #include <uuid/uuid.h>
 
+#include "utility.h"
+
 namespace android {
 namespace dm {
 
@@ -93,20 +95,6 @@ bool DeviceMapper::DeleteDevice(const std::string& name) {
             << "Didn't generate uevent for [" << name << "] removal";
 
     return true;
-}
-
-bool WaitForCondition(const std::function<bool()>& condition,
-                      const std::chrono::milliseconds& timeout_ms) {
-    auto start_time = std::chrono::steady_clock::now();
-    while (true) {
-        if (condition()) return true;
-
-        std::this_thread::sleep_for(20ms);
-
-        auto now = std::chrono::steady_clock::now();
-        auto time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time);
-        if (time_elapsed > timeout_ms) return false;
-    }
 }
 
 static std::string GenerateUuid() {
