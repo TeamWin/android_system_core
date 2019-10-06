@@ -658,9 +658,11 @@ static int __mount(const std::string& source, const std::string& target, const F
     }
     PINFO << __FUNCTION__ << "(source=" << source << source_missing << ",target=" << target
           << target_missing << ",type=" << entry.fs_type << ")=" << ret;
+#ifndef SKIP_SET_BLK_RO
     if ((ret == 0) && (mountflags & MS_RDONLY) != 0) {
         fs_mgr_set_blk_ro(source);
     }
+#endif
     errno = save_errno;
     return ret;
 }
@@ -1126,9 +1128,11 @@ int fs_mgr_mount_all(Fstab* fstab, int mount_mode) {
 
         // Skip mounting the root partition, as it will already have been mounted.
         if (current_entry.mount_point == "/" || current_entry.mount_point == "/system") {
+#ifndef SKIP_SET_BLK_RO
             if ((current_entry.flags & MS_RDONLY) != 0) {
                 fs_mgr_set_blk_ro(current_entry.blk_device);
             }
+#endif
             continue;
         }
 
