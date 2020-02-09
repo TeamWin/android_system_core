@@ -206,7 +206,24 @@ bool GetDeviceLockStatus() {
     if (!android::base::ReadFileToString("/proc/cmdline", &cmdline)) {
         return true;
     }
-    return cmdline.find("androidboot.verifiedbootstate=green") != std::string::npos;
+    // Always return unlocked if androidboot.verifiedbootstate is missing
+    // from the userspace kernel command line so kernel commits like:
+    // proc: Remove verifiedbootstate flag from /proc/cmdline
+    // can be used to pass the SafetyNet CTS check.
+    //
+    // Otherwise when using fastbootd the device will think it's locked
+    // because androidboot.verifiedbootstate=orange isn't there.
+    bool noverifiedbootstate =
+        cmdline.find("androidboot.verifiedbootstate") == std::string::npos;
+    bool verifiedbootstategreen =
+        cmdline.find("androidboot.verifiedbootstate=green") != std::string::npos;
+    if (noverifiedbootstate) {
+        return false;
+    } else if (verifiedbootstategreen) {
+        return false;
+    } else {
+        return cmdline.find("androidboot.verifiedbootstate=orange") == std::string::npos;
+    }
 }
 
 bool UpdateAllPartitionMetadata(FastbootDevice* device, const std::string& super_name,
