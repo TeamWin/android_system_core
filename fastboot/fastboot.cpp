@@ -1086,6 +1086,7 @@ static void flash_buf(const std::string& partition, struct fastboot_buffer *buf)
 static std::string get_current_slot() {
     std::string current_slot;
     if (fb->GetVar("current-slot", &current_slot) != fastboot::SUCCESS) return "";
+    if (current_slot[0] == '_') current_slot.erase(0, 1);
     return current_slot;
 }
 
@@ -1929,6 +1930,7 @@ int FastBootTool::Main(int argc, char* argv[]) {
             if (slot_override == "") {
                 std::string current_slot;
                 if (fb->GetVar("current-slot", &current_slot) == fastboot::SUCCESS) {
+                    if (current_slot[0] == '_') current_slot.erase(0, 1);
                     next_active = verify_slot(current_slot, false);
                 } else {
                     wants_set_active = false;
