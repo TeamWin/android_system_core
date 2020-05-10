@@ -1425,7 +1425,7 @@ Result<Success> ServiceParser::ParseSection(std::vector<std::string>&& args,
 
     if (SelinuxGetVendorAndroidVersion() <= __ANDROID_API_P__) {
         if (str_args[0] == "/sbin/watchdogd") {
-            str_args[0] = "/system/bin/watchdogd";
+            str_args[0] = "/sbin/watchdogd";
         }
     }
 

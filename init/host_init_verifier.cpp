@@ -74,7 +74,7 @@ passwd* getpwnam(const char* login) {  // NOLINT: implementing bad function.
     // This isn't thread safe, but that's okay for our purposes.
     static char static_name[32] = "";
     static char static_dir[32] = "/";
-    static char static_shell[32] = "/system/bin/sh";
+    static char static_shell[32] = "/sbin/sh";
     static passwd static_passwd = {
         .pw_name = static_name,
         .pw_dir = static_dir,

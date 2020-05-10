@@ -73,7 +73,7 @@ static int format_ext4(const std::string& fs_blkdev, const std::string& fs_mnt_p
 
     std::string size_str = std::to_string(dev_sz / 4096);
     const char* const mke2fs_args[] = {
-            "/system/bin/mke2fs", "-t",   "ext4", "-b", "4096", fs_blkdev.c_str(),
+            "/sbin/mke2fs", "-t",   "ext4", "-b", "4096", fs_blkdev.c_str(),
             size_str.c_str(),     nullptr};
 
     rc = android_fork_execvp_ext(arraysize(mke2fs_args), const_cast<char**>(mke2fs_args), NULL,
@@ -84,7 +84,7 @@ static int format_ext4(const std::string& fs_blkdev, const std::string& fs_mnt_p
     }
 
     const char* const e2fsdroid_args[] = {
-            "/system/bin/e2fsdroid", "-e", "-a", fs_mnt_point.c_str(), fs_blkdev.c_str(), nullptr};
+            "/sbin/e2fsdroid", "-e", "-a", fs_mnt_point.c_str(), fs_blkdev.c_str(), nullptr};
 
     rc = android_fork_execvp_ext(arraysize(e2fsdroid_args), const_cast<char**>(e2fsdroid_args),
                                  NULL, true, LOG_KLOG, true, nullptr, nullptr, 0);
@@ -111,7 +111,7 @@ static int format_f2fs(const std::string& fs_blkdev, uint64_t dev_sz, bool crypt
     std::string size_str = std::to_string(dev_sz / 4096);
     // clang-format off
     const char* const args[] = {
-        "/system/bin/make_f2fs",
+        "/sbin/make_f2fs",
         "-g", "android",
         fs_blkdev.c_str(),
         size_str.c_str(),

@@ -18,7 +18,7 @@
 // for SELinux operation for init.
 
 // When the system boots, there is no SEPolicy present and init is running in the kernel domain.
-// Init loads the SEPolicy from the file system, restores the context of /system/bin/init based on
+// Init loads the SEPolicy from the file system, restores the context of /sbin/init based on
 // this SEPolicy, and finally exec()'s itself to run in the proper domain.
 
 // The SEPolicy on Android comes in two variants: monolithic and split.
@@ -364,7 +364,7 @@ bool LoadSplitPolicy() {
 
     // clang-format off
     std::vector<const char*> compile_args {
-        "/system/bin/secilc",
+        "/sbin/secilc",
         use_userdebug_policy ? kDebugRamdiskSEPolicy: plat_policy_cil_file,
         "-m", "-M", "true", "-G", "-N",
         "-c", version_as_string.c_str(),

@@ -774,8 +774,8 @@ bool fs_mgr_overlayfs_mount_scratch(const std::string& device_path, const std::s
     return mounted;
 }
 
-const std::string kMkF2fs("/system/bin/make_f2fs");
-const std::string kMkExt4("/system/bin/mke2fs");
+const std::string kMkF2fs("/sbin/make_f2fs");
+const std::string kMkExt4("/sbin/mke2fs");
 
 // Only a suggestion for _first_ try during mounting
 std::string fs_mgr_overlayfs_scratch_mount_type() {
@@ -967,7 +967,7 @@ bool fs_mgr_overlayfs_invalid() {
     if (fs_mgr_overlayfs_valid() == OverlayfsValidResult::kNotSupported) return true;
 
     // in recovery, fastbootd, or gsi mode, not allowed!
-    if (fs_mgr_access("/system/bin/recovery")) return true;
+    if (fs_mgr_access("/sbin/recovery")) return true;
     auto save_errno = errno;
     auto ret = android::gsi::IsGsiRunning();
     errno = save_errno;
