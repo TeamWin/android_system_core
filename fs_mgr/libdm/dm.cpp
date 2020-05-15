@@ -26,6 +26,7 @@
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/macros.h>
+#include <android-base/properties.h>
 #include <android-base/strings.h>
 #include <uuid/uuid.h>
 
@@ -118,6 +119,10 @@ static std::string GenerateUuid() {
     return std::string{uuid_chars};
 }
 
+static bool IsRecovery() {
+    return access("/sbin/recovery", F_OK) == 0;
+}
+
 bool DeviceMapper::CreateDevice(const std::string& name, const DmTable& table, std::string* path,
                                 const std::chrono::milliseconds& timeout_ms) {
     std::string uuid = GenerateUuid();
@@ -139,16 +144,17 @@ bool DeviceMapper::CreateDevice(const std::string& name, const DmTable& table, s
         return true;
     }
 
-    auto condition = [&]() -> bool {
-        // If the file exists but returns EPERM or something, we consider the
-        // condition met.
-        if (access(unique_path.c_str(), F_OK) != 0) {
-            if (errno == ENOENT) return false;
+    if (IsRecovery()) {
+        bool non_ab_device = android::base::GetProperty("ro.build.ab_update", "").empty();
+        int sdk = android::base::GetIntProperty("ro.build.version.sdk", 0);
+        if (non_ab_device && sdk && sdk <= 29) {
+            LOG(INFO) << "Detected ueventd incompatibility, reverting to legacy libdm behavior.";
+            unique_path = *path;
         }
-        return true;
-    };
-    if (!WaitForCondition(condition, timeout_ms)) {
-        LOG(ERROR) << "Timed out waiting for device path: " << unique_path;
+    }
+
+    if (!WaitForFile(unique_path, timeout_ms)) {
+        LOG(ERROR) << "Failed waiting for device path: " << unique_path;
         DeleteDevice(name);
         return false;
     }
