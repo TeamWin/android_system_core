@@ -57,12 +57,15 @@ cc_defaults {
         uml: {
             cppflags: ["-DUSER_MODE_LINUX"],
         },
+<<<<<<< HEAD
         omnirom: {
             target_init_vendor_lib: {
                 cflags: ["-DTARGET_INIT_VENDOR_LIB"],
 		        static_libs: ["%s"],
 	        },
         },
+=======
+>>>>>>> 2715f8e50c... Revert "core: init: simplify libinit"
     },
     static_libs: [
         "libseccomp_policy",
