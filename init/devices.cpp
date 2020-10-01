@@ -20,6 +20,7 @@
 #include <fnmatch.h>
 #include <sys/sysmacros.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #include <chrono>
 #include <memory>
