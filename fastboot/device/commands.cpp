@@ -408,15 +408,11 @@ static bool EnterRecovery() {
 }
 
 bool RebootRecoveryHandler(FastbootDevice* device, const std::vector<std::string>& /* args */) {
-    auto status = true;
-    if (EnterRecovery()) {
-        status = device->WriteStatus(FastbootResult::OKAY, "Rebooting to recovery");
-    } else {
-        status = device->WriteStatus(FastbootResult::FAIL, "Unable to reboot to recovery");
-    }
+    auto result = device->WriteStatus(FastbootResult::OKAY, "Rebooting to recovery");
+    android::base::SetProperty(ANDROID_RB_PROPERTY, "reboot,recovery");
     device->CloseDevice();
     TEMP_FAILURE_RETRY(pause());
-    return status;
+    return result;
 }
 
 // Helper class for opening a handle to a MetadataBuilder and writing the new
