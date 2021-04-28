@@ -96,12 +96,12 @@ void FreeRamdisk(DIR* dir, dev_t dev) {
 
 bool ForceNormalBoot(std::string cmdline) {
     android::base::ReadFileToString("/proc/cmdline", &cmdline);
-    bool twrp_fastboot = cmdline.find("twrpfastboot=1") == std::string::npos;
+    bool twrp_fastboot = cmdline.find("androidboot.bootreason=reboot,bootloader") == std::string::npos;
     bool normal_boot = cmdline.find("androidboot.force_normal_boot=1") != std::string::npos;
-    PLOG(ERROR) << "ForceNormalBoot::twrp_fastboot: " << twrp_fastboot;
-    PLOG(ERROR) << "ForceNormalBoot::normal_boot: " << normal_boot;
-    //return twrp_fastboot && normal_boot;
-    return false;
+    LOG(ERROR) << "ForceNormalBoot::twrp_fastboot: " << twrp_fastboot;
+    LOG(ERROR) << "ForceNormalBoot::normal_boot: " << normal_boot;
+    return twrp_fastboot && normal_boot;
+    //return false;
 }
 
 }  // namespace
