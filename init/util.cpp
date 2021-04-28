@@ -719,8 +719,8 @@ void InitKernelLogging(char** argv) {
 }
 
 bool IsRecoveryMode() {
-    return true;
-    //return access("/system/bin/recovery", F_OK) == 0;
+    //return true;
+    return access("/system/bin/recovery", F_OK) == 0;
 }
 
 }  // namespace init
