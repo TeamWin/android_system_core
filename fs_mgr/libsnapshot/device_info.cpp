@@ -28,11 +28,7 @@ using android::hardware::boot::V1_0::CommandResult;
 
 using namespace std::string_literals;
 
-#ifdef __ANDROID_RECOVERY__
 constexpr bool kIsRecovery = true;
-#else
-constexpr bool kIsRecovery = false;
-#endif
 
 std::string DeviceInfo::GetGsidDir() const {
     return "ota"s;
