@@ -2545,6 +2545,10 @@ bool SnapshotManager::HandleImminentDataWipe(const std::function<void()>& callba
         return true;
     }
 
+    if (!UpdateForwardMergeIndicator(true)) {
+        return false;
+    }
+
     // Check this early, so we don't accidentally start trying to populate
     // the state file in recovery. Note we don't call GetUpdateState since
     // we want errors in acquiring the lock to be propagated, instead of
