@@ -2653,7 +2653,8 @@ bool SnapshotManager::ProcessUpdateStateOnDataWipe(bool allow_forward_merge,
                 LOG(ERROR) << "Reverting to old slot since update will be deleted.";
                 device_->SetSlotAsUnbootable(slot_number);
             } else {
-                LOG(INFO) << "Booting from " << slot << " slot, no action is taken.";
+                LOG(ERROR) << "Booting from " << slot << " slot, no action is taken.";
+                return false;
             }
             break;
         }
