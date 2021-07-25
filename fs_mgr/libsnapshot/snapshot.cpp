@@ -100,7 +100,8 @@ std::unique_ptr<SnapshotManager> SnapshotManager::NewForFirstStageMount(IDeviceI
 
 SnapshotManager::SnapshotManager(IDeviceInfo* device) : device_(device) {
     gsid_dir_ = device_->GetGsidDir();
-    metadata_dir_ = device_->GetMetadataDir();
+    //metadata_dir_ = device_->GetMetadataDir();
+    metadata_dir_ = "/metadata/ota/";
 }
 
 static std::string GetCowName(const std::string& snapshot_name) {
@@ -1019,6 +1020,7 @@ std::string SnapshotManager::GetSnapshotBootIndicatorPath() {
 }
 
 std::string SnapshotManager::GetRollbackIndicatorPath() {
+    LOG(INFO) << "recovery" << metadata_dir_ + "/" + android::base::Basename(kRollbackIndicatorPath);
     return metadata_dir_ + "/" + android::base::Basename(kRollbackIndicatorPath);
 }
 
@@ -2538,13 +2540,6 @@ bool SnapshotManager::HandleImminentDataWipe(const std::function<void()>& callba
     }
 
     auto mount = EnsureMetadataMounted();
-    if (!mount || !mount->HasDevice()) {
-        // We allow the wipe to continue, because if we can't mount /metadata,
-        // it is unlikely the device would have booted anyway. If there is no
-        // metadata partition, then the device predates Virtual A/B.
-        return true;
-    }
-
     if (!UpdateForwardMergeIndicator(true)) {
         return false;
     }
@@ -2590,11 +2585,6 @@ bool SnapshotManager::HandleImminentDataWipe(const std::function<void()>& callba
 bool SnapshotManager::FinishMergeInRecovery() {
     if (!device_->IsRecovery()) {
         LOG(ERROR) << "Data wipes are only allowed in recovery.";
-        return false;
-    }
-
-    auto mount = EnsureMetadataMounted();
-    if (!mount || !mount->HasDevice()) {
         return false;
     }
 
@@ -2747,7 +2737,6 @@ CreateResult SnapshotManager::RecoveryCreateSnapshotDevices(
 
 bool SnapshotManager::UpdateForwardMergeIndicator(bool wipe) {
     auto path = GetForwardMergeIndicatorPath();
-
     if (!wipe) {
         LOG(INFO) << "Wipe is not scheduled. Deleting forward merge indicator.";
         return RemoveFileIfExists(path);
