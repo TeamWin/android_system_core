@@ -273,11 +273,6 @@ bool ImageManager::DeleteBackingImage(const std::string& name) {
         return false;
     }
 
-    if (device_info_.is_recovery.value()) {
-        LOG(ERROR) << "Cannot remove images backed by /data in recovery";
-        return false;
-    }
-
     std::string message;
     auto header_file = GetImageHeaderPath(name);
     if (!SplitFiemap::RemoveSplitFiles(header_file, &message)) {
