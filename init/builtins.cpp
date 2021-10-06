@@ -664,8 +664,13 @@ static Result<void> do_install_keyring(const BuiltinArguments& args) {
     if (FscryptInstallKeyring()) {
         return Error() << "failed to install keyring";
     }
-    SetProperty("ro.crypto.state", "encrypted");
-    SetProperty("ro.crypto.type", "file");
+    std::string crypto_state = android::base::GetProperty("ro.crypto.state", "");
+    std::string crypto_type = android::base::GetProperty("ro.crypto.type", "");
+
+    if (crypto_state == "")
+        android::base::SetProperty("ro.crypto.state", "encrypted");
+    if (crypto_type == "")
+        android::base::SetProperty("ro.crypto.type", "file");
     return {};
 }
 
