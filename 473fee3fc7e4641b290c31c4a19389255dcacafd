@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b6cc7938_63b825c9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2021-10-06T20:04:02Z",
+      "side": 1,
+      "message": "This finishes up the cleanup from the bootable/recovery patch, of only setting the ro.crypto props when they haven\u0027t already been set.",
+      "revId": "473fee3fc7e4641b290c31c4a19389255dcacafd",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ]
+}
