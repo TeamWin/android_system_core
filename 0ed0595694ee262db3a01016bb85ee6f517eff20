@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9e962834_53ea401c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1
+      },
+      "writtenOn": "2021-11-21T18:28:25Z",
+      "side": 1,
+      "message": "TWRP doesn\u0027t use core for filesystem management. I prefer to have blkid updated for erofs support.",
+      "revId": "0ed0595694ee262db3a01016bb85ee6f517eff20",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ]
+}
