@@ -16,6 +16,24 @@
       "message": "TWRP doesn\u0027t use core for filesystem management. I prefer to have blkid updated for erofs support.",
       "revId": "0ed0595694ee262db3a01016bb85ee6f517eff20",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7f1227e7_79e85a67",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 780
+      },
+      "writtenOn": "2021-11-22T15:26:18Z",
+      "side": 1,
+      "message": "Thanks for pointing me that TWRP is using blkid instead of core for filesystem management. After patch #4762, mount point setted in twrp.flags can work perfectly now. So make this patch abandoned.",
+      "parentUuid": "9e962834_53ea401c",
+      "revId": "0ed0595694ee262db3a01016bb85ee6f517eff20",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
