@@ -13,10 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package {
-    default_applicable_licenses: ["Android-Apache-2.0"],
-}
-
 cc_defaults {
     name: "libziparchive_flags",
     cpp_std: "c++2a",
@@ -85,8 +81,8 @@ cc_defaults {
     ],
 
     // for FRIEND_TEST
-    header_libs: ["libgtest_prod_headers"],
-    export_header_lib_headers: ["libgtest_prod_headers"],
+    static_libs: ["libgtest_prod"],
+    export_static_lib_headers: ["libgtest_prod"],
 
     export_include_dirs: ["include"],
 }
@@ -116,9 +112,7 @@ cc_defaults {
     name: "libziparchive_lib_defaults",
     host_supported: true,
     vendor_available: true,
-    product_available: true,
     recovery_available: true,
-    vendor_ramdisk_available: true,
     native_bridge_supported: true,
     vndk: {
         enabled: true,
@@ -143,11 +137,9 @@ cc_defaults {
 
     apex_available: [
         "//apex_available:platform",
-        "com.android.art",
         "com.android.art.debug",
-        "com.android.virt",
+        "com.android.art.release",
     ],
-    min_sdk_version: "apex_inherit",
 }
 
 cc_library {
@@ -289,27 +281,7 @@ sh_test {
     test_suites: ["general-tests"],
     host_supported: true,
     device_supported: false,
+    test_config: "ziptool-tests.xml",
     data: ["cli-tests/**/*"],
     target_required: ["cli-test", "ziptool"],
-    data_device_bins: ["cli-test"],
-}
-
-python_test_host {
-    name: "ziparchive_tests_large",
-    srcs: ["test_ziparchive_large.py"],
-    main: "test_ziparchive_large.py",
-    version: {
-        py2: {
-            enabled: true,
-            embedded_launcher: false,
-        },
-        py3: {
-            enabled: false,
-            embedded_launcher: false,
-        },
-    },
-    test_suites: ["general-tests"],
-    test_options: {
-        unit_test: false,
-    },
 }
