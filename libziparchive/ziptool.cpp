@@ -34,6 +34,7 @@
 #include <android-base/file.h>
 #include <android-base/strings.h>
 #include <ziparchive/zip_archive.h>
+#include <zlib.h>
 
 using android::base::EndsWith;
 using android::base::StartsWith;
@@ -53,9 +54,11 @@ static Role role;
 static OverwriteMode overwrite_mode = kPrompt;
 static bool flag_1 = false;
 static std::string flag_d;
+static bool flag_j = false;
 static bool flag_l = false;
 static bool flag_p = false;
 static bool flag_q = false;
+static bool flag_t = false;
 static bool flag_v = false;
 static bool flag_x = false;
 static const char* archive_name = nullptr;
@@ -64,8 +67,10 @@ static std::set<std::string> excludes;
 static uint64_t total_uncompressed_length = 0;
 static uint64_t total_compressed_length = 0;
 static size_t file_count = 0;
+static size_t bad_crc_count = 0;
 
 static const char* g_progname;
+static int g_exit_code = 0;
 
 static void die(int error, const char* fmt, ...) {
   va_list ap;
@@ -133,8 +138,8 @@ static void MaybeShowHeader(ZipArchiveHandle zah) {
     if (!flag_1 && includes.empty() && excludes.empty()) {
       ZipArchiveInfo info{GetArchiveInfo(zah)};
       printf("Archive:  %s\n", archive_name);
-      printf("Zip file size: %" PRId64 " bytes, number of entries: %zu\n", info.archive_size,
-             info.entry_count);
+      printf("Zip file size: %" PRId64 " bytes, number of entries: %" PRIu64 "\n",
+             info.archive_size, info.entry_count);
     }
   }
 }
@@ -153,6 +158,18 @@ static void MaybeShowFooter() {
           "---------                     -------\n"
           "%9" PRId64 "                     %zu file%s\n",
           total_uncompressed_length, file_count, (file_count == 1) ? "" : "s");
+    } else if (flag_t) {
+      if (bad_crc_count != 0) {
+        printf("At least one error was detected in %s.\n", archive_name);
+      } else {
+        printf("No errors detected in ");
+        if (includes.empty() && excludes.empty()) {
+          printf("compressed data of %s.\n", archive_name);
+        } else {
+          printf("%s for the %zu file%s tested.\n", archive_name,
+                 file_count, file_count == 1 ? "" : "s");
+        }
+      }
     }
   } else {
     if (!flag_1 && includes.empty() && excludes.empty()) {
@@ -193,25 +210,59 @@ static bool PromptOverwrite(const std::string& dst) {
   }
 }
 
-static void ExtractToPipe(ZipArchiveHandle zah, ZipEntry& entry, const std::string& name) {
-  // We need to extract to memory because ExtractEntryToFile insists on
-  // being able to seek and truncate, and you can't do that with stdout.
-  uint8_t* buffer = new uint8_t[entry.uncompressed_length];
-  int err = ExtractToMemory(zah, &entry, buffer, entry.uncompressed_length);
+class TestWriter : public zip_archive::Writer {
+ public:
+  bool Append(uint8_t* buf, size_t size) {
+    crc = static_cast<uint32_t>(crc32(crc, reinterpret_cast<const Bytef*>(buf),
+                                      static_cast<uInt>(size)));
+    return true;
+  }
+  uint32_t crc = 0;
+};
+
+static void TestOne(ZipArchiveHandle zah, const ZipEntry64& entry, const std::string& name) {
+  if (!flag_q) printf("    testing: %-24s ", name.c_str());
+  TestWriter writer;
+  int err = ExtractToWriter(zah, &entry, &writer);
   if (err < 0) {
     die(0, "failed to extract %s: %s", name.c_str(), ErrorCodeString(err));
   }
-  if (!android::base::WriteFully(1, buffer, entry.uncompressed_length)) {
+  if (writer.crc == entry.crc32) {
+    if (!flag_q) printf("OK\n");
+  } else {
+    if (flag_q) printf("%-23s ", name.c_str());
+    printf("bad CRC %08" PRIx32 "  (should be %08" PRIx32 ")\n", writer.crc, entry.crc32);
+    bad_crc_count++;
+    g_exit_code = 2;
+  }
+}
+
+static void ExtractToPipe(ZipArchiveHandle zah, const ZipEntry64& entry, const std::string& name) {
+  // We need to extract to memory because ExtractEntryToFile insists on
+  // being able to seek and truncate, and you can't do that with stdout.
+  if (entry.uncompressed_length > SIZE_MAX) {
+    die(0, "entry size %" PRIu64 " is too large to extract.", entry.uncompressed_length);
+  }
+  auto uncompressed_length = static_cast<size_t>(entry.uncompressed_length);
+  uint8_t* buffer = new uint8_t[uncompressed_length];
+  int err = ExtractToMemory(zah, &entry, buffer, uncompressed_length);
+  if (err < 0) {
+    die(0, "failed to extract %s: %s", name.c_str(), ErrorCodeString(err));
+  }
+  if (!android::base::WriteFully(1, buffer, uncompressed_length)) {
     die(errno, "failed to write %s to stdout", name.c_str());
   }
   delete[] buffer;
 }
 
-static void ExtractOne(ZipArchiveHandle zah, ZipEntry& entry, const std::string& name) {
+static void ExtractOne(ZipArchiveHandle zah, const ZipEntry64& entry, std::string name) {
   // Bad filename?
   if (StartsWith(name, "/") || StartsWith(name, "../") || name.find("/../") != std::string::npos) {
     die(0, "bad filename %s", name.c_str());
   }
+
+  // Junk the path if we were asked to.
+  if (flag_j) name = android::base::Basename(name);
 
   // Where are we actually extracting to (for human-readable output)?
   // flag_d is the empty string if -d wasn't used, or has a trailing '/'
@@ -253,22 +304,22 @@ static void ExtractOne(ZipArchiveHandle zah, ZipEntry& entry, const std::string&
   close(fd);
 }
 
-static void ListOne(const ZipEntry& entry, const std::string& name) {
+static void ListOne(const ZipEntry64& entry, const std::string& name) {
   tm t = entry.GetModificationTime();
   char time[32];
   snprintf(time, sizeof(time), "%04d-%02d-%02d %02d:%02d", t.tm_year + 1900, t.tm_mon + 1,
            t.tm_mday, t.tm_hour, t.tm_min);
   if (flag_v) {
-    printf("%8d  %s  %7d %3.0f%% %s %08x  %s\n", entry.uncompressed_length,
+    printf("%8" PRIu64 "  %s %8" PRIu64 " %3.0f%% %s %08x  %s\n", entry.uncompressed_length,
            (entry.method == kCompressStored) ? "Stored" : "Defl:N", entry.compressed_length,
            CompressionRatio(entry.uncompressed_length, entry.compressed_length), time, entry.crc32,
            name.c_str());
   } else {
-    printf("%9d  %s   %s\n", entry.uncompressed_length, time, name.c_str());
+    printf("%9" PRIu64 "  %s   %s\n", entry.uncompressed_length, time, name.c_str());
   }
 }
 
-static void InfoOne(const ZipEntry& entry, const std::string& name) {
+static void InfoOne(const ZipEntry64& entry, const std::string& name) {
   if (flag_1) {
     // "android-ndk-r19b/sources/android/NOTICE"
     printf("%s\n", name.c_str());
@@ -323,14 +374,17 @@ static void InfoOne(const ZipEntry& entry, const std::string& name) {
            t.tm_mday, t.tm_hour, t.tm_min);
 
   // "-rw-r--r--  3.0 unx      577 t- defX 19-Feb-12 16:09 android-ndk-r19b/sources/android/NOTICE"
-  printf("%s %2d.%d %s %8d %c%c %s %s %s\n", mode, version / 10, version % 10, src_fs,
+  printf("%s %2d.%d %s %8" PRIu64 " %c%c %s %s %s\n", mode, version / 10, version % 10, src_fs,
          entry.uncompressed_length, entry.is_text ? 't' : 'b',
          entry.has_data_descriptor ? 'X' : 'x', method, time, name.c_str());
 }
 
-static void ProcessOne(ZipArchiveHandle zah, ZipEntry& entry, const std::string& name) {
+static void ProcessOne(ZipArchiveHandle zah, const ZipEntry64& entry, const std::string& name) {
   if (role == kUnzip) {
-    if (flag_l || flag_v) {
+    if (flag_t) {
+      // -t.
+      TestOne(zah, entry, name);
+    } else if (flag_l || flag_v) {
       // -l or -lv or -lq or -v.
       ListOne(entry, name);
     } else {
@@ -361,7 +415,7 @@ static void ProcessAll(ZipArchiveHandle zah) {
     die(0, "couldn't iterate %s: %s", archive_name, ErrorCodeString(err));
   }
 
-  ZipEntry entry;
+  ZipEntry64 entry;
   std::string name;
   while ((err = Next(cookie, &entry, &name)) >= 0) {
     if (ShouldInclude(name)) ProcessOne(zah, entry, name);
@@ -384,11 +438,13 @@ static void ShowHelp(bool full) {
         "exclude (-x) lists use shell glob patterns.\n"
         "\n"
         "-d DIR	Extract into DIR\n"
+        "-j	Junk (ignore) file paths\n"
         "-l	List contents (-lq excludes archive name, -lv is verbose)\n"
         "-n	Never overwrite files (default: prompt)\n"
         "-o	Always overwrite files\n"
         "-p	Pipe to stdout\n"
         "-q	Quiet\n"
+        "-t	Test compressed data (do not extract)\n"
         "-v	List contents verbosely\n"
         "-x FILE	Exclude files\n");
   } else {
@@ -456,11 +512,21 @@ int main(int argc, char* argv[]) {
     }
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "-d:hlnopqvx", opts, nullptr)) != -1) {
+    while ((opt = getopt_long(argc, argv, "-Dd:hjlnopqtvx", opts, nullptr)) != -1) {
       switch (opt) {
+        case 'D':
+          // Undocumented and ignored, since we never use the times from the zip
+          // file when creating files or directories. Moreover, libziparchive
+          // only looks at the DOS last modified date anyway. There's no code to
+          // use the GMT modification/access times in the extra field at the
+          // moment.
+          break;
         case 'd':
           flag_d = optarg;
           if (!EndsWith(flag_d, "/")) flag_d += '/';
+          break;
+        case 'j':
+          flag_j = true;
           break;
         case 'l':
           flag_l = true;
@@ -476,6 +542,9 @@ int main(int argc, char* argv[]) {
           break;
         case 'q':
           flag_q = true;
+          break;
+        case 't':
+          flag_t = true;
           break;
         case 'v':
           flag_v = true;
@@ -524,5 +593,5 @@ int main(int argc, char* argv[]) {
   ProcessAll(zah);
 
   CloseArchive(zah);
-  return 0;
+  return g_exit_code;
 }

@@ -23,76 +23,14 @@
 #include <unistd.h>
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "android-base/macros.h"
 #include "android-base/mapped_file.h"
-
-static const char* kErrorMessages[] = {
-    "Success",
-    "Iteration ended",
-    "Zlib error",
-    "Invalid file",
-    "Invalid handle",
-    "Duplicate entries in archive",
-    "Empty archive",
-    "Entry not found",
-    "Invalid offset",
-    "Inconsistent information",
-    "Invalid entry name",
-    "I/O error",
-    "File mapping failed",
-    "Allocation failed",
-};
-
-enum ErrorCodes : int32_t {
-  kIterationEnd = -1,
-
-  // We encountered a Zlib error when inflating a stream from this file.
-  // Usually indicates file corruption.
-  kZlibError = -2,
-
-  // The input file cannot be processed as a zip archive. Usually because
-  // it's too small, too large or does not have a valid signature.
-  kInvalidFile = -3,
-
-  // An invalid iteration / ziparchive handle was passed in as an input
-  // argument.
-  kInvalidHandle = -4,
-
-  // The zip archive contained two (or possibly more) entries with the same
-  // name.
-  kDuplicateEntry = -5,
-
-  // The zip archive contains no entries.
-  kEmptyArchive = -6,
-
-  // The specified entry was not found in the archive.
-  kEntryNotFound = -7,
-
-  // The zip archive contained an invalid local file header pointer.
-  kInvalidOffset = -8,
-
-  // The zip archive contained inconsistent entry information. This could
-  // be because the central directory & local file header did not agree, or
-  // if the actual uncompressed length or crc32 do not match their declared
-  // values.
-  kInconsistentInformation = -9,
-
-  // An invalid entry name was encountered.
-  kInvalidEntryName = -10,
-
-  // An I/O related system call (read, lseek, ftruncate, map) failed.
-  kIoError = -11,
-
-  // We were not able to mmap the central directory or entry contents.
-  kMmapFailed = -12,
-
-  // An allocation failed.
-  kAllocationFailed = -13,
-
-  kLastErrorCode = kAllocationFailed,
-};
+#include "android-base/memory.h"
+#include "zip_cd_entry_map.h"
+#include "zip_error.h"
 
 class MappedZipFile {
  public:
@@ -147,26 +85,6 @@ class CentralDirectory {
   size_t length_;
 };
 
-/**
- * More space efficient string representation of strings in an mmaped zipped
- * file than std::string_view. Using std::string_view as an entry in the
- * ZipArchive hash table wastes space. std::string_view stores a pointer to a
- * string (on 64 bit, 8 bytes) and the length to read from that pointer,
- * 2 bytes. Because of alignment, the structure consumes 16 bytes, wasting
- * 6 bytes.
- *
- * ZipStringOffset stores a 4 byte offset from a fixed location in the memory
- * mapped file instead of the entire address, consuming 8 bytes with alignment.
- */
-struct ZipStringOffset {
-  uint32_t name_offset;
-  uint16_t name_length;
-
-  const std::string_view ToStringView(const uint8_t* start) const {
-    return std::string_view{reinterpret_cast<const char*>(start + name_offset), name_length};
-  }
-};
-
 struct ZipArchive {
   // open Zip archive
   mutable MappedZipFile mapped_zip;
@@ -178,14 +96,8 @@ struct ZipArchive {
   std::unique_ptr<android::base::MappedFile> directory_map;
 
   // number of entries in the Zip archive
-  uint16_t num_entries;
-
-  // We know how many entries are in the Zip archive, so we can have a
-  // fixed-size hash table. We define a load factor of 0.75 and over
-  // allocate so the maximum number entries can never be higher than
-  // ((4 * UINT16_MAX) / 3 + 1) which can safely fit into a uint32_t.
-  uint32_t hash_table_size;
-  ZipStringOffset* hash_table;
+  uint64_t num_entries;
+  std::unique_ptr<CdEntryMapInterface> cd_entry_map;
 
   ZipArchive(MappedZipFile&& map, bool assume_ownership);
   ZipArchive(const void* address, size_t length);
@@ -193,3 +105,18 @@ struct ZipArchive {
 
   bool InitializeCentralDirectory(off64_t cd_start_offset, size_t cd_size);
 };
+
+// Reads the unaligned data of type |T| and auto increment the offset.
+template <typename T>
+static T ConsumeUnaligned(uint8_t** address) {
+  auto ret = android::base::get_unaligned<T>(*address);
+  *address += sizeof(T);
+  return ret;
+}
+
+// Writes the unaligned data of type |T| and auto increment the offset.
+template <typename T>
+void EmitUnaligned(uint8_t** address, T data) {
+  android::base::put_unaligned<T>(*address, data);
+  *address += sizeof(T);
+}
