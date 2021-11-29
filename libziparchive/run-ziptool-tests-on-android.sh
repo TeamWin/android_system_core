@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Copy the tests across.
-adb shell rm -rf /data/local/tmp/ziptool-tests/
-adb shell mkdir /data/local/tmp/ziptool-tests/
-adb push cli-tests/ /data/local/tmp/ziptool-tests/
-#adb push cli-test /data/local/tmp/ziptool-tests/
+test_dir=/data/local/tests/unrestricted/ziptool-tests
+
+# TODO(b/169618311): remove this "adb push" command.
+adb push cli-tests/ "$test_dir"
 
 if tty -s; then
   dash_t="-t"
@@ -12,4 +12,4 @@ else
   dash_t=""
 fi
 
-exec adb shell $dash_t cli-test /data/local/tmp/ziptool-tests/cli-tests/*.test
+exec adb shell "$dash_t" "${test_dir}"/cli-test "${test_dir}"/cli-tests/*.test

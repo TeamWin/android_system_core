@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "zip_archive_private.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -23,16 +21,24 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <map>
 #include <memory>
+#include <set>
+#include <string_view>
 #include <vector>
 
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/mapped_file.h>
+#include <android-base/memory.h>
+#include <android-base/strings.h>
 #include <android-base/unique_fd.h>
 #include <gtest/gtest.h>
 #include <ziparchive/zip_archive.h>
 #include <ziparchive/zip_archive_stream_entry.h>
+
+#include "zip_archive_common.h"
+#include "zip_archive_private.h"
 
 static std::string test_data_dir = android::base::GetExecutableDirectory() + "/testdata";
 
@@ -51,6 +57,76 @@ static const std::vector<uint8_t> kBTxtContents{'a', 'b', 'c', 'd', 'e', 'f', 'g
 static int32_t OpenArchiveWrapper(const std::string& name, ZipArchiveHandle* handle) {
   const std::string abs_path = test_data_dir + "/" + name;
   return OpenArchive(abs_path.c_str(), handle);
+}
+
+class CdEntryMapTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    names_ = {
+        "a.txt", "b.txt", "b/", "b/c.txt", "b/d.txt",
+    };
+    separator_ = "separator";
+    header_ = "metadata";
+    joined_names_ = header_ + android::base::Join(names_, separator_);
+    base_ptr_ = reinterpret_cast<uint8_t*>(&joined_names_[0]);
+
+    entry_maps_.emplace_back(CdEntryMapZip32::Create(static_cast<uint16_t>(names_.size())));
+    entry_maps_.emplace_back(CdEntryMapZip64::Create());
+    for (auto& cd_map : entry_maps_) {
+      ASSERT_NE(nullptr, cd_map);
+      size_t offset = header_.size();
+      for (const auto& name : names_) {
+        auto status = cd_map->AddToMap(
+            std::string_view{joined_names_.c_str() + offset, name.size()}, base_ptr_);
+        ASSERT_EQ(0, status);
+        offset += name.size() + separator_.size();
+      }
+    }
+  }
+
+  std::vector<std::string> names_;
+  // A continuous region of memory serves as a mock of the central directory.
+  std::string joined_names_;
+  // We expect some metadata at the beginning of the central directory and between filenames.
+  std::string header_;
+  std::string separator_;
+
+  std::vector<std::unique_ptr<CdEntryMapInterface>> entry_maps_;
+  uint8_t* base_ptr_{nullptr};  // Points to the start of the central directory.
+};
+
+TEST_F(CdEntryMapTest, AddDuplicatedEntry) {
+  for (auto& cd_map : entry_maps_) {
+    std::string_view name = "b.txt";
+    ASSERT_NE(0, cd_map->AddToMap(name, base_ptr_));
+  }
+}
+
+TEST_F(CdEntryMapTest, FindEntry) {
+  for (auto& cd_map : entry_maps_) {
+    uint64_t expected_offset = header_.size();
+    for (const auto& name : names_) {
+      auto [status, offset] = cd_map->GetCdEntryOffset(name, base_ptr_);
+      ASSERT_EQ(status, kSuccess);
+      ASSERT_EQ(offset, expected_offset);
+      expected_offset += name.size() + separator_.size();
+    }
+  }
+}
+
+TEST_F(CdEntryMapTest, Iteration) {
+  std::set<std::string_view> expected(names_.begin(), names_.end());
+  for (auto& cd_map : entry_maps_) {
+    cd_map->ResetIteration();
+    std::set<std::string_view> entry_set;
+    auto ret = cd_map->Next(base_ptr_);
+    while (ret != std::pair<std::string_view, uint64_t>{}) {
+      auto [it, insert_status] = entry_set.insert(ret.first);
+      ASSERT_TRUE(insert_status);
+      ret = cd_map->Next(base_ptr_);
+    }
+    ASSERT_EQ(expected, entry_set);
+  }
 }
 
 TEST(ziparchive, Open) {
@@ -141,7 +217,7 @@ TEST(ziparchive, Iteration_std_string_view) {
   void* iteration_cookie;
   ASSERT_EQ(0, StartIteration(handle, &iteration_cookie));
 
-  ZipEntry data;
+  ZipEntry64 data;
   std::vector<std::string_view> names;
   std::string_view name;
   while (Next(iteration_cookie, &data, &name) == 0) names.push_back(name);
@@ -154,6 +230,22 @@ TEST(ziparchive, Iteration_std_string_view) {
   CloseArchive(handle);
 }
 
+static void AssertIterationNames(void* iteration_cookie,
+                                 const std::vector<std::string>& expected_names_sorted) {
+  ZipEntry64 data;
+  std::vector<std::string> names;
+  std::string_view name;
+  for (size_t i = 0; i < expected_names_sorted.size(); ++i) {
+    ASSERT_EQ(0, Next(iteration_cookie, &data, &name));
+    names.push_back(std::string(name));
+  }
+  // End of iteration.
+  ASSERT_EQ(-1, Next(iteration_cookie, &data, &name));
+  // Assert that the names are as expected.
+  std::sort(names.begin(), names.end());
+  ASSERT_EQ(expected_names_sorted, names);
+}
+
 static void AssertIterationOrder(const std::string_view prefix, const std::string_view suffix,
                                  const std::vector<std::string>& expected_names_sorted) {
   ZipArchiveHandle handle;
@@ -161,23 +253,19 @@ static void AssertIterationOrder(const std::string_view prefix, const std::strin
 
   void* iteration_cookie;
   ASSERT_EQ(0, StartIteration(handle, &iteration_cookie, prefix, suffix));
-
-  ZipEntry data;
-  std::vector<std::string> names;
-
-  std::string name;
-  for (size_t i = 0; i < expected_names_sorted.size(); ++i) {
-    ASSERT_EQ(0, Next(iteration_cookie, &data, &name));
-    names.push_back(name);
-  }
-
-  // End of iteration.
-  ASSERT_EQ(-1, Next(iteration_cookie, &data, &name));
+  AssertIterationNames(iteration_cookie, expected_names_sorted);
   CloseArchive(handle);
+}
 
-  // Assert that the names are as expected.
-  std::sort(names.begin(), names.end());
-  ASSERT_EQ(expected_names_sorted, names);
+static void AssertIterationOrderWithMatcher(std::function<bool(std::string_view)> matcher,
+                                            const std::vector<std::string>& expected_names_sorted) {
+  ZipArchiveHandle handle;
+  ASSERT_EQ(0, OpenArchiveWrapper(kValidZip, &handle));
+
+  void* iteration_cookie;
+  ASSERT_EQ(0, StartIteration(handle, &iteration_cookie, matcher));
+  AssertIterationNames(iteration_cookie, expected_names_sorted);
+  CloseArchive(handle);
 }
 
 TEST(ziparchive, Iteration) {
@@ -206,6 +294,30 @@ TEST(ziparchive, IterationWithPrefixAndSuffix) {
   AssertIterationOrder("b", ".txt", kExpectedMatchesSorted);
 }
 
+TEST(ziparchive, IterationWithAdditionalMatchesExactly) {
+  static const std::vector<std::string> kExpectedMatchesSorted = {"a.txt"};
+  auto matcher = [](std::string_view name) { return name == "a.txt"; };
+  AssertIterationOrderWithMatcher(matcher, kExpectedMatchesSorted);
+}
+
+TEST(ziparchive, IterationWithAdditionalMatchesWithSuffix) {
+  static const std::vector<std::string> kExpectedMatchesSorted = {"a.txt", "b.txt", "b/c.txt",
+                                                                  "b/d.txt"};
+  auto matcher = [](std::string_view name) {
+    return name == "a.txt" || android::base::EndsWith(name, ".txt");
+  };
+  AssertIterationOrderWithMatcher(matcher, kExpectedMatchesSorted);
+}
+
+TEST(ziparchive, IterationWithAdditionalMatchesWithPrefixAndSuffix) {
+  static const std::vector<std::string> kExpectedMatchesSorted = {"a.txt", "b/c.txt", "b/d.txt"};
+  auto matcher = [](std::string_view name) {
+    return name == "a.txt" ||
+           (android::base::EndsWith(name, ".txt") && android::base::StartsWith(name, "b/"));
+  };
+  AssertIterationOrderWithMatcher(matcher, kExpectedMatchesSorted);
+}
+
 TEST(ziparchive, IterationWithBadPrefixAndSuffix) {
   ZipArchiveHandle handle;
   ASSERT_EQ(0, OpenArchiveWrapper(kValidZip, &handle));
@@ -213,8 +325,8 @@ TEST(ziparchive, IterationWithBadPrefixAndSuffix) {
   void* iteration_cookie;
   ASSERT_EQ(0, StartIteration(handle, &iteration_cookie, "x", "y"));
 
-  ZipEntry data;
-  std::string name;
+  ZipEntry64 data;
+  std::string_view name;
 
   // End of iteration.
   ASSERT_EQ(-1, Next(iteration_cookie, &data, &name));
@@ -226,14 +338,14 @@ TEST(ziparchive, FindEntry) {
   ZipArchiveHandle handle;
   ASSERT_EQ(0, OpenArchiveWrapper(kValidZip, &handle));
 
-  ZipEntry data;
+  ZipEntry64 data;
   ASSERT_EQ(0, FindEntry(handle, "a.txt", &data));
 
   // Known facts about a.txt, from zipinfo -v.
   ASSERT_EQ(63, data.offset);
   ASSERT_EQ(kCompressDeflated, data.method);
-  ASSERT_EQ(static_cast<uint32_t>(17), data.uncompressed_length);
-  ASSERT_EQ(static_cast<uint32_t>(13), data.compressed_length);
+  ASSERT_EQ(17u, data.uncompressed_length);
+  ASSERT_EQ(13u, data.compressed_length);
   ASSERT_EQ(0x950821c5, data.crc32);
   ASSERT_EQ(static_cast<uint32_t>(0x438a8005), data.mod_time);
 
@@ -247,7 +359,7 @@ TEST(ziparchive, FindEntry_empty) {
   ZipArchiveHandle handle;
   ASSERT_EQ(0, OpenArchiveWrapper(kValidZip, &handle));
 
-  ZipEntry data;
+  ZipEntry64 data;
   ASSERT_EQ(kInvalidEntryName, FindEntry(handle, "", &data));
 
   CloseArchive(handle);
@@ -258,7 +370,7 @@ TEST(ziparchive, FindEntry_too_long) {
   ASSERT_EQ(0, OpenArchiveWrapper(kValidZip, &handle));
 
   std::string very_long_name(65536, 'x');
-  ZipEntry data;
+  ZipEntry64 data;
   ASSERT_EQ(kInvalidEntryName, FindEntry(handle, very_long_name, &data));
 
   CloseArchive(handle);
@@ -271,8 +383,8 @@ TEST(ziparchive, TestInvalidDeclaredLength) {
   void* iteration_cookie;
   ASSERT_EQ(0, StartIteration(handle, &iteration_cookie));
 
-  std::string name;
-  ZipEntry data;
+  std::string_view name;
+  ZipEntry64 data;
 
   ASSERT_EQ(Next(iteration_cookie, &data, &name), 0);
   ASSERT_EQ(Next(iteration_cookie, &data, &name), 0);
@@ -303,9 +415,9 @@ TEST(ziparchive, OpenArchiveFdRange) {
                                   static_cast<off64_t>(leading_garbage.size())));
 
   // An entry that's deflated.
-  ZipEntry data;
+  ZipEntry64 data;
   ASSERT_EQ(0, FindEntry(handle, "a.txt", &data));
-  const uint32_t a_size = data.uncompressed_length;
+  const auto a_size = static_cast<size_t>(data.uncompressed_length);
   ASSERT_EQ(a_size, kATxtContents.size());
   auto buffer = std::unique_ptr<uint8_t[]>(new uint8_t[a_size]);
   ASSERT_EQ(0, ExtractToMemory(handle, &data, buffer.get(), a_size));
@@ -313,7 +425,7 @@ TEST(ziparchive, OpenArchiveFdRange) {
 
   // An entry that's stored.
   ASSERT_EQ(0, FindEntry(handle, "b.txt", &data));
-  const uint32_t b_size = data.uncompressed_length;
+  const auto b_size = static_cast<size_t>(data.uncompressed_length);
   ASSERT_EQ(b_size, kBTxtContents.size());
   buffer = std::unique_ptr<uint8_t[]>(new uint8_t[b_size]);
   ASSERT_EQ(0, ExtractToMemory(handle, &data, buffer.get(), b_size));
@@ -327,9 +439,9 @@ TEST(ziparchive, ExtractToMemory) {
   ASSERT_EQ(0, OpenArchiveWrapper(kValidZip, &handle));
 
   // An entry that's deflated.
-  ZipEntry data;
+  ZipEntry64 data;
   ASSERT_EQ(0, FindEntry(handle, "a.txt", &data));
-  const uint32_t a_size = data.uncompressed_length;
+  const auto a_size = static_cast<size_t>(data.uncompressed_length);
   ASSERT_EQ(a_size, kATxtContents.size());
   uint8_t* buffer = new uint8_t[a_size];
   ASSERT_EQ(0, ExtractToMemory(handle, &data, buffer, a_size));
@@ -338,7 +450,7 @@ TEST(ziparchive, ExtractToMemory) {
 
   // An entry that's stored.
   ASSERT_EQ(0, FindEntry(handle, "b.txt", &data));
-  const uint32_t b_size = data.uncompressed_length;
+  const auto b_size = static_cast<size_t>(data.uncompressed_length);
   ASSERT_EQ(b_size, kBTxtContents.size());
   buffer = new uint8_t[b_size];
   ASSERT_EQ(0, ExtractToMemory(handle, &data, buffer, b_size));
@@ -391,11 +503,14 @@ TEST(ziparchive, EmptyEntries) {
   ZipArchiveHandle handle;
   ASSERT_EQ(0, OpenArchiveFd(tmp_file.fd, "EmptyEntriesTest", &handle, false));
 
-  ZipEntry entry;
+  ZipEntry64 entry;
   ASSERT_EQ(0, FindEntry(handle, "empty.txt", &entry));
-  ASSERT_EQ(static_cast<uint32_t>(0), entry.uncompressed_length);
+  ASSERT_EQ(0u, entry.uncompressed_length);
+  // Extraction to a 1 byte buffer should succeed.
   uint8_t buffer[1];
   ASSERT_EQ(0, ExtractToMemory(handle, &entry, buffer, 1));
+  // Extraction to an empty buffer should succeed.
+  ASSERT_EQ(0, ExtractToMemory(handle, &entry, nullptr, 0));
 
   TemporaryFile tmp_output_file;
   ASSERT_NE(-1, tmp_output_file.fd);
@@ -414,7 +529,7 @@ TEST(ziparchive, EntryLargerThan32K) {
   ZipArchiveHandle handle;
   ASSERT_EQ(0, OpenArchiveFd(tmp_file.fd, "EntryLargerThan32KTest", &handle, false));
 
-  ZipEntry entry;
+  ZipEntry64 entry;
   ASSERT_EQ(0, FindEntry(handle, kAbTxtName, &entry));
   ASSERT_EQ(kAbUncompressedSize, entry.uncompressed_length);
 
@@ -471,7 +586,7 @@ TEST(ziparchive, ExtractToFile) {
   ZipArchiveHandle handle;
   ASSERT_EQ(0, OpenArchiveWrapper(kValidZip, &handle));
 
-  ZipEntry entry;
+  ZipEntry64 entry;
   ASSERT_EQ(0, FindEntry(handle, "a.txt", &entry));
   ASSERT_EQ(0, ExtractEntryToFile(handle, &entry, tmp_file.fd));
 
@@ -482,9 +597,9 @@ TEST(ziparchive, ExtractToFile) {
   ASSERT_EQ(0, memcmp(read_buffer, data, data_size));
 
   // Assert that the remainder of the file contains the incompressed data.
-  std::vector<uint8_t> uncompressed_data(entry.uncompressed_length);
-  ASSERT_TRUE(
-      android::base::ReadFully(tmp_file.fd, uncompressed_data.data(), entry.uncompressed_length));
+  std::vector<uint8_t> uncompressed_data(static_cast<size_t>(entry.uncompressed_length));
+  ASSERT_TRUE(android::base::ReadFully(tmp_file.fd, uncompressed_data.data(),
+                                       static_cast<size_t>(entry.uncompressed_length)));
   ASSERT_EQ(0, memcmp(&uncompressed_data[0], kATxtContents.data(), kATxtContents.size()));
 
   // Assert that the total length of the file is sane
@@ -508,7 +623,7 @@ TEST(ziparchive, OpenFromMemory) {
             OpenArchiveFromMemory(file_map->data(), file_map->size(), zip_path.c_str(), &handle));
 
   // Assert one entry can be found and extracted correctly.
-  ZipEntry binary_entry;
+  ZipEntry64 binary_entry;
   ASSERT_EQ(0, FindEntry(handle, "META-INF/com/google/android/update-binary", &binary_entry));
   TemporaryFile tmp_binary;
   ASSERT_NE(-1, tmp_binary.fd);
@@ -523,13 +638,13 @@ static void ZipArchiveStreamTest(ZipArchiveHandle& handle, const std::string& en
   if (raw) {
     stream.reset(ZipArchiveStreamEntry::CreateRaw(handle, *entry));
     if (entry->method == kCompressStored) {
-      read_data->resize(entry->uncompressed_length);
+      read_data->resize(static_cast<size_t>(entry->uncompressed_length));
     } else {
-      read_data->resize(entry->compressed_length);
+      read_data->resize(static_cast<size_t>(entry->compressed_length));
     }
   } else {
     stream.reset(ZipArchiveStreamEntry::Create(handle, *entry));
-    read_data->resize(entry->uncompressed_length);
+    read_data->resize(static_cast<size_t>(entry->uncompressed_length));
   }
   uint8_t* read_data_ptr = read_data->data();
   ASSERT_TRUE(stream.get() != nullptr);
@@ -569,7 +684,7 @@ static void ZipArchiveStreamTestUsingMemory(const std::string& zip_file,
   std::vector<uint8_t> read_data;
   ZipArchiveStreamTest(handle, entry_name, false, true, &entry, &read_data);
 
-  std::vector<uint8_t> cmp_data(entry.uncompressed_length);
+  std::vector<uint8_t> cmp_data(static_cast<size_t>(entry.uncompressed_length));
   ASSERT_EQ(entry.uncompressed_length, read_data.size());
   ASSERT_EQ(
       0, ExtractToMemory(handle, &entry, cmp_data.data(), static_cast<uint32_t>(cmp_data.size())));
@@ -629,8 +744,8 @@ TEST(ziparchive, StreamUncompressedBadCrc) {
 //       FileOutputStream fos = new
 //       FileOutputStream("/tmp/data_descriptor.zip");
 //       ZipOutputStream zos = new ZipOutputStream(fos);
-//       ZipEntry ze = new ZipEntry("name");
-//       ze.setMethod(ZipEntry.DEFLATED);
+//       ZipEntry64 ze = new ZipEntry64("name");
+//       ze.setMethod(ZipEntry64.DEFLATED);
 //       zos.putNextEntry(ze);
 //       zos.write("abdcdefghijk".getBytes());
 //       zos.closeEntry();
@@ -668,9 +783,9 @@ static void ExtractEntryToMemory(const std::vector<uint8_t>& zip_data,
   // This function expects a variant of kDataDescriptorZipFile, for look for
   // an entry whose name is "name" and whose size is 12 (contents =
   // "abdcdefghijk").
-  ZipEntry entry;
+  ZipEntry64 entry;
   ASSERT_EQ(0, FindEntry(handle, "name", &entry));
-  ASSERT_EQ(static_cast<uint32_t>(12), entry.uncompressed_length);
+  ASSERT_EQ(12u, entry.uncompressed_length);
 
   entry_out->resize(12);
   (*error_code_out) = ExtractToMemory(handle, &entry, &((*entry_out)[0]), 12);
@@ -775,12 +890,12 @@ class VectorReader : public zip_archive::Reader {
  public:
   VectorReader(const std::vector<uint8_t>& input) : Reader(), input_(input) {}
 
-  bool ReadAtOffset(uint8_t* buf, size_t len, uint32_t offset) const {
+  bool ReadAtOffset(uint8_t* buf, size_t len, off64_t offset) const {
     if ((offset + len) < input_.size()) {
       return false;
     }
 
-    memcpy(buf, &input_[offset], len);
+    memcpy(buf, &input_[static_cast<size_t>(offset)], len);
     return true;
   }
 
@@ -807,7 +922,7 @@ class BadReader : public zip_archive::Reader {
  public:
   BadReader() : Reader() {}
 
-  bool ReadAtOffset(uint8_t*, size_t, uint32_t) const { return false; }
+  bool ReadAtOffset(uint8_t*, size_t, off64_t) const { return false; }
 };
 
 class BadWriter : public zip_archive::Writer {
@@ -856,4 +971,447 @@ TEST(ziparchive, Inflate) {
     ASSERT_EQ(kIoError, ret);
     ASSERT_EQ(0u, writer.GetOutput().size());
   }
+}
+
+// The class constructs a zipfile with zip64 format, and test the parsing logic.
+class Zip64ParseTest : public ::testing::Test {
+ protected:
+  struct LocalFileEntry {
+    std::vector<uint8_t> local_file_header;
+    std::string file_name;
+    std::vector<uint8_t> extended_field;
+    // Fake data to mimic the compressed bytes in the zipfile.
+    std::vector<uint8_t> compressed_bytes;
+    std::vector<uint8_t> data_descriptor;
+
+    size_t GetSize() const {
+      return local_file_header.size() + file_name.size() + extended_field.size() +
+             compressed_bytes.size() + data_descriptor.size();
+    }
+
+    void CopyToOutput(std::vector<uint8_t>* output) const {
+      std::copy(local_file_header.begin(), local_file_header.end(), std::back_inserter(*output));
+      std::copy(file_name.begin(), file_name.end(), std::back_inserter(*output));
+      std::copy(extended_field.begin(), extended_field.end(), std::back_inserter(*output));
+      std::copy(compressed_bytes.begin(), compressed_bytes.end(), std::back_inserter(*output));
+      std::copy(data_descriptor.begin(), data_descriptor.end(), std::back_inserter(*output));
+    }
+  };
+
+  struct CdRecordEntry {
+    std::vector<uint8_t> central_directory_record;
+    std::string file_name;
+    std::vector<uint8_t> extended_field;
+
+    size_t GetSize() const {
+      return central_directory_record.size() + file_name.size() + extended_field.size();
+    }
+
+    void CopyToOutput(std::vector<uint8_t>* output) const {
+      std::copy(central_directory_record.begin(), central_directory_record.end(),
+                std::back_inserter(*output));
+      std::copy(file_name.begin(), file_name.end(), std::back_inserter(*output));
+      std::copy(extended_field.begin(), extended_field.end(), std::back_inserter(*output));
+    }
+  };
+
+  static void ConstructLocalFileHeader(const std::string& name, std::vector<uint8_t>* output,
+                                       uint32_t uncompressed_size, uint32_t compressed_size) {
+    LocalFileHeader lfh = {};
+    lfh.lfh_signature = LocalFileHeader::kSignature;
+    lfh.compressed_size = compressed_size;
+    lfh.uncompressed_size = uncompressed_size;
+    lfh.file_name_length = static_cast<uint16_t>(name.size());
+    lfh.extra_field_length = 20;
+    *output = std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&lfh),
+                                   reinterpret_cast<uint8_t*>(&lfh) + sizeof(LocalFileHeader));
+  }
+
+  // Put one zip64 extended info in the extended field.
+  static void ConstructExtendedField(const std::vector<uint64_t>& zip64_fields,
+                                     std::vector<uint8_t>* output) {
+    ASSERT_FALSE(zip64_fields.empty());
+    uint16_t data_size = 8 * static_cast<uint16_t>(zip64_fields.size());
+    std::vector<uint8_t> extended_field(data_size + 4);
+    android::base::put_unaligned(extended_field.data(), Zip64ExtendedInfo::kHeaderId);
+    android::base::put_unaligned(extended_field.data() + 2, data_size);
+    size_t offset = 4;
+    for (const auto& field : zip64_fields) {
+      android::base::put_unaligned(extended_field.data() + offset, field);
+      offset += 8;
+    }
+
+    *output = std::move(extended_field);
+  }
+
+  static void ConstructCentralDirectoryRecord(const std::string& name, uint32_t uncompressed_size,
+                                              uint32_t compressed_size, uint32_t local_offset,
+                                              std::vector<uint8_t>* output) {
+    CentralDirectoryRecord cdr = {};
+    cdr.record_signature = CentralDirectoryRecord::kSignature;
+    cdr.compressed_size = uncompressed_size;
+    cdr.uncompressed_size = compressed_size;
+    cdr.file_name_length = static_cast<uint16_t>(name.size());
+    cdr.extra_field_length = local_offset == UINT32_MAX ? 28 : 20;
+    cdr.local_file_header_offset = local_offset;
+    *output =
+        std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&cdr),
+                             reinterpret_cast<uint8_t*>(&cdr) + sizeof(CentralDirectoryRecord));
+  }
+
+  // Add an entry to the zipfile, construct the corresponding local header and cd entry.
+  void AddEntry(const std::string& name, const std::vector<uint8_t>& content,
+                bool uncompressed_size_in_extended, bool compressed_size_in_extended,
+                bool local_offset_in_extended, bool include_data_descriptor = false) {
+    auto uncompressed_size = static_cast<uint32_t>(content.size());
+    auto compressed_size = static_cast<uint32_t>(content.size());
+    uint32_t local_file_header_offset = 0;
+    std::for_each(file_entries_.begin(), file_entries_.end(),
+                  [&local_file_header_offset](const LocalFileEntry& file_entry) {
+                    local_file_header_offset += file_entry.GetSize();
+                  });
+
+    std::vector<uint64_t> zip64_fields;
+    if (uncompressed_size_in_extended) {
+      zip64_fields.push_back(uncompressed_size);
+      uncompressed_size = UINT32_MAX;
+    }
+    if (compressed_size_in_extended) {
+      zip64_fields.push_back(compressed_size);
+      compressed_size = UINT32_MAX;
+    }
+    LocalFileEntry local_entry = {
+        .local_file_header = {},
+        .file_name = name,
+        .extended_field = {},
+        .compressed_bytes = content,
+    };
+    ConstructLocalFileHeader(name, &local_entry.local_file_header, uncompressed_size,
+                             compressed_size);
+    ConstructExtendedField(zip64_fields, &local_entry.extended_field);
+    if (include_data_descriptor) {
+      size_t descriptor_size = compressed_size_in_extended ? 24 : 16;
+      local_entry.data_descriptor.resize(descriptor_size);
+      uint8_t* write_ptr = local_entry.data_descriptor.data();
+      EmitUnaligned<uint32_t>(&write_ptr, DataDescriptor::kOptSignature);
+      EmitUnaligned<uint32_t>(&write_ptr, 0 /* crc */);
+      if (compressed_size_in_extended) {
+        EmitUnaligned<uint64_t>(&write_ptr, compressed_size_in_extended);
+        EmitUnaligned<uint64_t>(&write_ptr, uncompressed_size_in_extended);
+      } else {
+        EmitUnaligned<uint32_t>(&write_ptr, compressed_size_in_extended);
+        EmitUnaligned<uint32_t>(&write_ptr, uncompressed_size_in_extended);
+      }
+    }
+
+    file_entries_.push_back(std::move(local_entry));
+
+    if (local_offset_in_extended) {
+      zip64_fields.push_back(local_file_header_offset);
+      local_file_header_offset = UINT32_MAX;
+    }
+    CdRecordEntry cd_entry = {
+        .central_directory_record = {},
+        .file_name = name,
+        .extended_field = {},
+    };
+    ConstructCentralDirectoryRecord(name, uncompressed_size, compressed_size,
+                                    local_file_header_offset, &cd_entry.central_directory_record);
+    ConstructExtendedField(zip64_fields, &cd_entry.extended_field);
+    cd_entries_.push_back(std::move(cd_entry));
+  }
+
+  void ConstructEocd() {
+    ASSERT_EQ(file_entries_.size(), cd_entries_.size());
+    Zip64EocdRecord zip64_eocd = {};
+    zip64_eocd.record_signature = Zip64EocdRecord::kSignature;
+    zip64_eocd.num_records = file_entries_.size();
+    zip64_eocd.cd_size = 0;
+    std::for_each(
+        cd_entries_.begin(), cd_entries_.end(),
+        [&zip64_eocd](const CdRecordEntry& cd_entry) { zip64_eocd.cd_size += cd_entry.GetSize(); });
+    zip64_eocd.cd_start_offset = 0;
+    std::for_each(file_entries_.begin(), file_entries_.end(),
+                  [&zip64_eocd](const LocalFileEntry& file_entry) {
+                    zip64_eocd.cd_start_offset += file_entry.GetSize();
+                  });
+    zip64_eocd_record_ =
+        std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&zip64_eocd),
+                             reinterpret_cast<uint8_t*>(&zip64_eocd) + sizeof(Zip64EocdRecord));
+
+    Zip64EocdLocator zip64_locator = {};
+    zip64_locator.locator_signature = Zip64EocdLocator::kSignature;
+    zip64_locator.zip64_eocd_offset = zip64_eocd.cd_start_offset + zip64_eocd.cd_size;
+    zip64_eocd_locator_ =
+        std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&zip64_locator),
+                             reinterpret_cast<uint8_t*>(&zip64_locator) + sizeof(Zip64EocdLocator));
+
+    EocdRecord eocd = {};
+    eocd.eocd_signature = EocdRecord::kSignature,
+    eocd.num_records = file_entries_.size() > UINT16_MAX
+                           ? UINT16_MAX
+                           : static_cast<uint16_t>(file_entries_.size());
+    eocd.cd_size = UINT32_MAX;
+    eocd.cd_start_offset = UINT32_MAX;
+    eocd_record_ = std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&eocd),
+                                        reinterpret_cast<uint8_t*>(&eocd) + sizeof(EocdRecord));
+  }
+
+  // Concatenate all the local file entries, cd entries, and eocd metadata.
+  void ConstructZipFile() {
+    for (const auto& file_entry : file_entries_) {
+      file_entry.CopyToOutput(&zip_content_);
+    }
+    for (const auto& cd_entry : cd_entries_) {
+      cd_entry.CopyToOutput(&zip_content_);
+    }
+    std::copy(zip64_eocd_record_.begin(), zip64_eocd_record_.end(),
+              std::back_inserter(zip_content_));
+    std::copy(zip64_eocd_locator_.begin(), zip64_eocd_locator_.end(),
+              std::back_inserter(zip_content_));
+    std::copy(eocd_record_.begin(), eocd_record_.end(), std::back_inserter(zip_content_));
+  }
+
+  std::vector<uint8_t> zip_content_;
+
+  std::vector<LocalFileEntry> file_entries_;
+  std::vector<CdRecordEntry> cd_entries_;
+  std::vector<uint8_t> zip64_eocd_record_;
+  std::vector<uint8_t> zip64_eocd_locator_;
+  std::vector<uint8_t> eocd_record_;
+};
+
+TEST_F(Zip64ParseTest, openFile) {
+  AddEntry("a.txt", std::vector<uint8_t>(100, 'a'), true, true, false);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, openFilelocalOffsetInExtendedField) {
+  AddEntry("a.txt", std::vector<uint8_t>(100, 'a'), true, true, true);
+  AddEntry("b.txt", std::vector<uint8_t>(200, 'b'), true, true, true);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, openFileCompressedNotInExtendedField) {
+  AddEntry("a.txt", std::vector<uint8_t>(100, 'a'), true, false, false);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  // Zip64 extended fields must include both uncompressed and compressed size.
+  ASSERT_NE(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, findEntry) {
+  AddEntry("a.txt", std::vector<uint8_t>(200, 'a'), true, true, true);
+  AddEntry("b.txt", std::vector<uint8_t>(300, 'b'), true, true, false);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  ZipEntry64 entry;
+  ASSERT_EQ(0, FindEntry(handle, "a.txt", &entry));
+  ASSERT_EQ(200, entry.uncompressed_length);
+  ASSERT_EQ(200, entry.compressed_length);
+
+  ASSERT_EQ(0, FindEntry(handle, "b.txt", &entry));
+  ASSERT_EQ(300, entry.uncompressed_length);
+  ASSERT_EQ(300, entry.compressed_length);
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, dataDescriptor) {
+  AddEntry("a.txt", std::vector<uint8_t>(200, 'a'), true, true, true, false);
+  AddEntry("b.txt", std::vector<uint8_t>(300, 'b'), true, true, true, false);
+  // We want a file with compressed size in extended fields, but
+  // data descriptor still in 32 bit values.
+  auto& local_entry = file_entries_.back();
+  local_entry.data_descriptor.resize(16);
+  uint8_t* write_ptr = local_entry.data_descriptor.data();
+  EmitUnaligned<uint32_t>(&write_ptr, DataDescriptor::kOptSignature);
+  EmitUnaligned<uint32_t>(&write_ptr, 0 /* crc */);
+  EmitUnaligned<uint32_t>(&write_ptr, 300);
+  EmitUnaligned<uint32_t>(&write_ptr, 300);
+
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(),
+                                     "debug_zip64", &handle));
+  ZipEntry64 entry;
+  ASSERT_EQ(0, FindEntry(handle, "a.txt", &entry));
+  ASSERT_EQ(200, entry.uncompressed_length);
+  ASSERT_EQ(200, entry.compressed_length);
+
+  ASSERT_EQ(0, FindEntry(handle, "b.txt", &entry));
+  ASSERT_EQ(300, entry.uncompressed_length);
+  ASSERT_EQ(300, entry.compressed_length);
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, openFileIncorrectDataSizeInLocalExtendedField) {
+  AddEntry("a.txt", std::vector<uint8_t>(100, 'a'), true, true, false);
+  ASSERT_EQ(1, file_entries_.size());
+  auto& extended_field = file_entries_[0].extended_field;
+  // data size exceeds the extended field size in local header.
+  android::base::put_unaligned<uint16_t>(extended_field.data() + 2, 30);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  ZipEntry64 entry;
+  ASSERT_NE(0, FindEntry(handle, "a.txt", &entry));
+
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, iterates) {
+  std::set<std::string_view> names{"a.txt", "b.txt", "c.txt", "d.txt", "e.txt"};
+  for (const auto& name : names) {
+    AddEntry(std::string(name), std::vector<uint8_t>(100, name[0]), true, true, true);
+  }
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+
+  void* iteration_cookie;
+  ASSERT_EQ(0, StartIteration(handle, &iteration_cookie));
+  std::set<std::string_view> result;
+  std::string_view name;
+  ZipEntry64 entry;
+  while (Next(iteration_cookie, &entry, &name) == 0) result.emplace(name);
+  ASSERT_EQ(names, result);
+
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, zip64EocdWrongLocatorOffset) {
+  AddEntry("a.txt", std::vector<uint8_t>(1, 'a'), true, true, true);
+  ConstructEocd();
+  zip_content_.resize(20, 'a');
+  std::copy(zip64_eocd_locator_.begin(), zip64_eocd_locator_.end(),
+            std::back_inserter(zip_content_));
+  std::copy(eocd_record_.begin(), eocd_record_.end(), std::back_inserter(zip_content_));
+
+  ZipArchiveHandle handle;
+  ASSERT_NE(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  CloseArchive(handle);
+}
+
+TEST_F(Zip64ParseTest, extract) {
+  std::vector<uint8_t> content(200, 'a');
+  AddEntry("a.txt", content, true, true, true);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  ZipEntry64 entry;
+  ASSERT_EQ(0, FindEntry(handle, "a.txt", &entry));
+
+  VectorWriter writer;
+  ASSERT_EQ(0, ExtractToWriter(handle, &entry, &writer));
+  ASSERT_EQ(content, writer.GetOutput());
+}
+
+TEST_F(Zip64ParseTest, extractWithDataDescriptor) {
+  std::vector<uint8_t> content(300, 'b');
+  AddEntry("a.txt", std::vector<uint8_t>(200, 'a'), true, true, true);
+  AddEntry("b.txt", content, true, true, true, true /* data descriptor */);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(
+      0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(), "debug_zip64", &handle));
+  ZipEntry64 entry;
+  ASSERT_EQ(0, FindEntry(handle, "b.txt", &entry));
+
+  VectorWriter writer;
+  ASSERT_EQ(0, ExtractToWriter(handle, &entry, &writer));
+  ASSERT_EQ(content, writer.GetOutput());
+}
+
+TEST_F(Zip64ParseTest, extraLFHOffset) {
+  std::vector<uint8_t> content(300, 'b');
+  AddEntry("a.txt", std::vector<uint8_t>(200, 'a'), true, true, true);
+  AddEntry("b.txt", content, true, true, true, true /* data descriptor */);
+
+  ASSERT_EQ(cd_entries_.back().extended_field.size(), 4 + 8 * 3)
+      << "Extended field should contain 2 bytes id, 2 bytes size, and 3 "
+         "values, each 64 bit";
+  uint32_t local_file_header_offset = 0;
+  std::for_each(file_entries_.begin(), file_entries_.end() - 1,
+                [&local_file_header_offset](const LocalFileEntry& file_entry) {
+                  local_file_header_offset += file_entry.GetSize();
+                });
+  auto& cd_entry = cd_entries_.back();
+  // We want to construct a central directory record with LFH < 0xFFFFFFFF
+  // but still comes with a 64 bit LFH in extended field.
+  ConstructCentralDirectoryRecord(
+      "b.txt", static_cast<uint32_t>(content.size()),
+      static_cast<uint32_t>(content.size()), local_file_header_offset,
+      &cd_entry.central_directory_record);
+  ConstructEocd();
+  ConstructZipFile();
+
+  ZipArchiveHandle handle;
+  ASSERT_EQ(0, OpenArchiveFromMemory(zip_content_.data(), zip_content_.size(),
+                                     "debug_zip64", &handle));
+  ZipEntry64 entry;
+  ASSERT_EQ(0, FindEntry(handle, "b.txt", &entry));
+
+  VectorWriter writer;
+  ASSERT_EQ(0, ExtractToWriter(handle, &entry, &writer));
+  ASSERT_EQ(content, writer.GetOutput());
+}
+
+TEST(ziparchive, Bug174945959) {
+  static const std::vector<uint8_t> zip {
+    0x50, 0x4b, 0x03, 0x04, 0x50, 0x4b, 0x01, 0x02, 0x01, 0x53, 0x46, 0x5b,
+    0xa4, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf8, 0x7f, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0x03, 0x12, 0x00, 0x07, 0x00, 0x00, 0x3b, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xeb, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x00, 0xa4, 0x2e, 0x00, 0x00, 0x00,
+    0x24, 0x24, 0xb6, 0x3f, 0xff, 0xff, 0x31, 0x51, 0x49, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0x4b, 0x05, 0x50, 0x4b, 0x05, 0x06, 0xc5, 0x1f, 0x4a, 0x04, 0x00, 0x21,
+    0x01, 0x00, 0x6a, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00};
+  ZipArchiveHandle handle;
+  ASSERT_EQ(0, OpenArchiveFromMemory(&zip[0], zip.size(), "name", &handle));
+
+  void* cookie;
+  ASSERT_EQ(0, StartIteration(handle, &cookie));
+  ZipEntry ze;
+  std::string name;
+  int result;
+  while ((result = Next(cookie, &ze, &name)) == 0) {
+  }
+  EndIteration(cookie);
 }
