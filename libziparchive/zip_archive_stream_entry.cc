@@ -78,7 +78,7 @@ bool ZipArchiveStreamEntryUncompressed::Init(const ZipEntry& entry) {
 }
 
 const std::vector<uint8_t>* ZipArchiveStreamEntryUncompressed::Read() {
-  // Simple sanity check. The vector should *only* be handled by this code. A caller
+  // Simple validity check. The vector should *only* be handled by this code. A caller
   // should not const-cast and modify the capacity. This may invalidate next_out.
   //
   // Note: it would be better to store the results of data() across Read calls.
@@ -200,7 +200,7 @@ bool ZipArchiveStreamEntryCompressed::Verify() {
 }
 
 const std::vector<uint8_t>* ZipArchiveStreamEntryCompressed::Read() {
-  // Simple sanity check. The vector should *only* be handled by this code. A caller
+  // Simple validity check. The vector should *only* be handled by this code. A caller
   // should not const-cast and modify the capacity. This may invalidate next_out.
   //
   // Note: it would be better to store the results of data() across Read calls.

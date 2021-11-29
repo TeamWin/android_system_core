@@ -146,3 +146,92 @@ after: [ ! -d d1/d2/dir ]
 expected-stdout:
 	bb
 ---
+
+name: unzip -j
+# Note: the RI outputs a bunch of trailing whitespace for some reason.
+command: unzip -j $FILES/example.zip d1/d2/x.txt | sed 's/ *$//'
+after: [ ! -f d1/d2/x.txt ]
+after: [ -f x.txt ]
+expected-stdout:
+	Archive:  $FILES/example.zip
+	  inflating: x.txt
+---
+
+name: unzip -t one
+command: unzip -t $FILES/example.zip d1/d2/x.txt
+after: [ ! -d d1 ]
+expected-stdout:
+	Archive:  $FILES/example.zip
+	    testing: d1/d2/x.txt              OK
+	No errors detected in $FILES/example.zip for the 1 file tested.
+---
+
+name: unzip -tq all
+command: unzip -tq $FILES/example.zip
+after: [ ! -f d1/d2/x.txt ]
+expected-stdout:
+	No errors detected in compressed data of $FILES/example.zip.
+---
+
+name: unzip -tq one
+command: unzip -tq $FILES/example.zip d1/d2/x.txt
+after: [ ! -f d1/d2/x.txt ]
+expected-stdout:
+	No errors detected in $FILES/example.zip for the 1 file tested.
+
+---
+
+name: unzip -tq two
+command: unzip -tq $FILES/example.zip d1/d2/x.txt d1/d2/b.txt
+after: [ ! -f d1/d2/x.txt ]
+expected-stdout:
+	No errors detected in $FILES/example.zip for the 2 files tested.
+
+---
+
+name: unzip -t one bad
+command: unzip -t $FILES/bad_crc.zip a.txt
+after: [ ! -f a.txt ]
+expected-stdout:
+	Archive:  $FILES/bad_crc.zip
+	    testing: a.txt                    bad CRC 950821c5  (should be 950821e5)
+	At least one error was detected in $FILES/bad_crc.zip.
+expected-exit-status: 2
+
+#---
+#
+# TODO: test requires file iteration order.
+#name: unzip -tq all bad
+#command: unzip -tq $FILES/bad_crc.zip
+#after: [ ! -f a.txt ]
+#after: [ ! -f b.txt ]
+#expected-stdout:
+#	a.txt                   bad CRC 950821c5  (should be 950821e5)
+#	b.txt                   bad CRC 5912b84d  (should be 5912b84e)
+#	At least one error was detected in $FILES/bad_crc.zip.
+#expected-exit-status: 2
+
+---
+
+name: unzip -tq one bad
+command: unzip -tq $FILES/bad_crc.zip a.txt
+after: [ ! -f a.txt ]
+expected-stdout:
+	a.txt                   bad CRC 950821c5  (should be 950821e5)
+	At least one error was detected in $FILES/bad_crc.zip.
+expected-exit-status: 2
+
+#---
+#
+# TODO: test requires file iteration order.
+#name: unzip -tq two bad
+#command: unzip -tq $FILES/bad_crc.zip a.txt b.txt
+#after: [ ! -f a.txt ]
+#after: [ ! -f b.txt ]
+#expected-stdout:
+#	a.txt                   bad CRC 950821c5  (should be 950821e5)
+#	b.txt                   bad CRC 5912b84d  (should be 5912b84e)
+#	At least one error was detected in $FILES/bad_crc.zip.
+#expected-exit-status: 2
+
+---
