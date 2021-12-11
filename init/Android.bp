@@ -197,22 +197,6 @@ cc_library_static {
         type: "lite",
         export_proto_headers: true,
     },
-
-    target: {
-        recovery: {
-            cflags: ["-DRECOVERY"],
-            exclude_static_libs: [
-                "libxml2",
-            ],
-            exclude_generated_sources: [
-                "apex-info-list",
-            ],
-            exclude_shared_libs: [
-                "libbinder",
-                "libutils",
-            ],
-        },
-    },
 }
 
 phony {
@@ -238,18 +222,6 @@ cc_binary {
     ],
     srcs: ["main.cpp"],
     symlinks: ["ueventd"],
-    target: {
-        recovery: {
-            cflags: ["-DRECOVERY"],
-            exclude_static_libs: [
-                "libxml2",
-            ],
-            exclude_shared_libs: [
-                "libbinder",
-                "libutils",
-            ],
-        },
-    },
     visibility: ["//packages/modules/Virtualization/microdroid"],
 }
 
