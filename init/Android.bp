@@ -239,21 +239,15 @@ cc_library_static {
     target: {
         recovery: {
             cflags: ["-DRECOVERY"],
-            exclude_static_libs: [
-                "libxml2",
-            ],
             exclude_generated_sources: [
                 "apex-info-list",
-            ],
-            exclude_shared_libs: [
-                "libbinder",
-                "libutils",
             ],
         },
     },
     visibility: [
         "//system/apex/apexd",
         "//frameworks/native/cmds/installd",
+        "//bootable/recovery:__subpackages__",
     ],
 }
 
