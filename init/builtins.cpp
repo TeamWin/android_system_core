@@ -661,7 +661,7 @@ static Result<void> queue_fs_event(int code, bool userdata_remount) {
 }
 
 static Result<void> do_install_keyring(const BuiltinArguments& args) {
-    if (FscryptInstallKeyring()) {
+    if (!FscryptInstallKeyring()) {
         return Error() << "failed to install keyring";
     }
     std::string crypto_state = android::base::GetProperty("ro.crypto.state", "");
