@@ -131,6 +131,8 @@ void AppendExtent(google::protobuf::RepeatedPtrField<chromeos_update_engine::Ext
 
 bool IsCompressionEnabled();
 
+bool IsUserspaceSnapshotsEnabled();
+
 // Swap the suffix of a partition name.
 std::string GetOtherPartitionName(const std::string& name);
 

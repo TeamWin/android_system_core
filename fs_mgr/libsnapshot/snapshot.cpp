@@ -2566,6 +2566,7 @@ bool SnapshotManager::WriteUpdateState(LockedFile* lock, UpdateState state,
         status.set_compression_enabled(old_status.compression_enabled());
         status.set_source_build_fingerprint(old_status.source_build_fingerprint());
         status.set_merge_phase(old_status.merge_phase());
+        status.set_userspace_snapshots(old_status.userspace_snapshots());
     }
     return WriteSnapshotUpdateStatus(lock, status);
 }
@@ -2703,6 +2704,34 @@ bool SnapshotManager::EnsureSnapuserdConnected() {
         return false;
     }
     return true;
+}
+
+bool SnapshotManager::UpdateUsesUserSnapshots() {
+    // This and the following function is constantly
+    // invoked during snapshot merge. We want to avoid
+    // constantly reading from disk. Hence, store this
+    // value in memory.
+    //
+    // Furthermore, this value in the disk is set
+    // only when OTA is applied and doesn't change
+    // during merge phase. Hence, once we know that
+    // the value is read from disk the very first time,
+    // it is safe to read successive checks from memory.
+    if (is_snapshot_userspace_.has_value()) {
+        return is_snapshot_userspace_.value();
+    }
+    auto lock = LockShared();
+    if (!lock) return false;
+    return UpdateUsesUserSnapshots(lock.get());
+}
+bool SnapshotManager::UpdateUsesUserSnapshots(LockedFile* lock) {
+    // See UpdateUsesUserSnapshots()
+    if (is_snapshot_userspace_.has_value()) {
+        return is_snapshot_userspace_.value();
+    }
+    SnapshotUpdateStatus update_status = ReadSnapshotUpdateStatus(lock);
+    is_snapshot_userspace_ = update_status.userspace_snapshots();
+    return is_snapshot_userspace_.value();
 }
 
 void SnapshotManager::UnmapAndDeleteCowPartition(MetadataBuilder* current_metadata) {
@@ -2883,6 +2912,30 @@ Return SnapshotManager::CreateUpdateSnapshots(const DeltaArchiveManifest& manife
     SnapshotUpdateStatus status = ReadSnapshotUpdateStatus(lock.get());
     status.set_state(update_state);
     status.set_compression_enabled(cow_creator.compression_enabled);
+    if (cow_creator.compression_enabled) {
+        bool userSnapshotsEnabled = IsUserspaceSnapshotsEnabled();
+        const std::string UNKNOWN = "unknown";
+        const std::string vendor_release = android::base::GetProperty(
+                "ro.vendor.build.version.release_or_codename", UNKNOWN);
+
+        // No user-space snapshots if vendor partition is on Android 12
+        if (vendor_release.find("12") != std::string::npos) {
+            LOG(INFO) << "Userspace snapshots disabled as vendor partition is on Android: "
+                      << vendor_release;
+            userSnapshotsEnabled = false;
+        }
+
+        // Userspace snapshots is enabled only if compression is enabled
+        status.set_userspace_snapshots(userSnapshotsEnabled);
+        if (userSnapshotsEnabled) {
+            is_snapshot_userspace_ = true;
+            LOG(INFO) << "Userspace snapshots enabled";
+        } else {
+            is_snapshot_userspace_ = false;
+            LOG(INFO) << "Userspace snapshots disabled";
+        }
+    }
+
     if (!WriteSnapshotUpdateStatus(lock.get(), status)) {
         LOG(ERROR) << "Unable to write new update state";
         return Return::Error();

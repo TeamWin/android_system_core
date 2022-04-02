@@ -22,6 +22,7 @@
 
 #include <android-base/file.h>
 #include <android-base/logging.h>
+#include <android-base/parseint.h>
 #include <android-base/properties.h>
 #include <android-base/strings.h>
 #include <fs_mgr/roots.h>
@@ -185,6 +186,21 @@ void AppendExtent(RepeatedPtrField<chromeos_update_engine::Extent>* extents, uin
 
 bool IsCompressionEnabled() {
     return android::base::GetBoolProperty("ro.virtual_ab.compression.enabled", false);
+}
+
+bool IsUserspaceSnapshotsEnabled() {
+    const std::string UNKNOWN = "unknown";
+    const std::string vendor_release =
+            android::base::GetProperty("ro.vendor.build.version.release_or_codename", UNKNOWN);
+
+    // No user-space snapshots if vendor partition is on Android 12
+    if (vendor_release.find("12") != std::string::npos) {
+        LOG(INFO) << "Userspace snapshots disabled as vendor partition is on Android: "
+                  << vendor_release;
+        return false;
+    }
+
+    return android::base::GetBoolProperty("ro.virtual_ab.userspace.snapshots.enabled", false);
 }
 
 std::string GetOtherPartitionName(const std::string& name) {
