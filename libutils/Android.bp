@@ -97,10 +97,6 @@ cc_defaults {
             },
         },
 
-        recovery: {
-            exclude_shared_libs: ["libvndksupport"],
-        },
-
         linux_bionic: {
             enabled: true,
         },
