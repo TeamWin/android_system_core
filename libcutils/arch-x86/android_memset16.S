@@ -96,7 +96,7 @@ name:					\
    jump table with relative offsets.   */
 # define BRANCH_TO_JMPTBL_ENTRY(TABLE)				\
     /* We first load PC into EBX.  */				\
-    call	__x86.get_pc_thunk.bx;				\
+    call	__x86.get_pc_thunk_16.bx;				\
     /* Get the address of the jump table.  */			\
     add		$(TABLE - .), %ebx;				\
     /* Get the entry and convert the relative offset to the	\
@@ -105,12 +105,12 @@ name:					\
     /* We loaded the jump table and adjuested EDX. Go.  */	\
     jmp		*%ebx
 
-	.section	.gnu.linkonce.t.__x86.get_pc_thunk.bx,"ax",@progbits
-	.globl	__x86.get_pc_thunk.bx
-	.hidden	__x86.get_pc_thunk.bx
+	.section	.gnu.linkonce.t.__x86.get_pc_thunk_16.bx,"ax",@progbits
+	.globl	__x86.get_pc_thunk_16.bx
+	.hidden	__x86.get_pc_thunk_16.bx
 	ALIGN (4)
-	.type	__x86.get_pc_thunk.bx,@function
-__x86.get_pc_thunk.bx:
+	.type	__x86.get_pc_thunk_16.bx,@function
+__x86.get_pc_thunk_16.bx:
 	movl	(%esp), %ebx
 	ret
 #else
@@ -342,7 +342,7 @@ L(128bytesormore):
 	mov	$SHARED_CACHE_SIZE, %ebx
 #else
 # if (defined SHARED || defined __PIC__)
-	call	__x86.get_pc_thunk.bx
+	call	__x86.get_pc_thunk_16.bx
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
 	mov	__x86_shared_cache_size@GOTOFF(%ebx), %ebx
 # else
@@ -361,7 +361,7 @@ L(128bytesormore):
 #else
 # if (defined SHARED || defined __PIC__)
 #  define RESTORE_EBX_STATE
-	call	__x86.get_pc_thunk.bx
+	call	__x86.get_pc_thunk_16.bx
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
 	cmp	__x86_data_cache_size@GOTOFF(%ebx), %ecx
 # else
