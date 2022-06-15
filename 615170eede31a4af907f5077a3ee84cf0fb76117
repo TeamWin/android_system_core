@@ -16,6 +16,23 @@
       "message": "they two were conflicting each other when building x86 target, don\u0027t sure if that\u0027s the correct fix",
       "revId": "615170eede31a4af907f5077a3ee84cf0fb76117",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8c874b98_837a561a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 938
+      },
+      "writtenOn": "2022-06-15T12:13:51Z",
+      "side": 1,
+      "message": "compilation passed and TWRP booted after this change",
+      "revId": "615170eede31a4af907f5077a3ee84cf0fb76117",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
