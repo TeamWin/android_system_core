@@ -68,6 +68,24 @@
       "message": "In what way? Any examples?",
       "revId": "dc47a67150638402de00244fa283bd11c466d9fe",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "a9baff78_4bbd6223",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 938
+      },
+      "writtenOn": "2022-06-16T14:57:07Z",
+      "side": 1,
+      "message": "just use it on the terminal as usual.. like on linux pc...",
+      "parentUuid": "7b6e26f8_957b5e04",
+      "revId": "dc47a67150638402de00244fa283bd11c466d9fe",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
