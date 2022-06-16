@@ -33,6 +33,24 @@
       "message": "How would this be executed and used?",
       "revId": "dc47a67150638402de00244fa283bd11c466d9fe",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "cf885bda_8fd05edd",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 938
+      },
+      "writtenOn": "2022-06-16T14:34:45Z",
+      "side": 1,
+      "message": "use it on terminal",
+      "parentUuid": "4ddae174_00f2517e",
+      "revId": "dc47a67150638402de00244fa283bd11c466d9fe",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
