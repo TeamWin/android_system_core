@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6543fffc_4b5eff20",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 938
+      },
+      "writtenOn": "2022-06-16T14:11:24Z",
+      "side": 1,
+      "message": "optional feature, for flashing other devices through USB OTG",
+      "revId": "dc47a67150638402de00244fa283bd11c466d9fe",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ]
+}
