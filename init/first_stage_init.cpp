@@ -179,6 +179,17 @@ bool LoadKernelModules(bool recovery, bool want_console, int& modules_loaded) {
     if (modules_loaded > 0) {
         return retval;
     }
+
+    // Try to load the module built into twrp
+    if (recovery && access("/vendor/lib/modules/1.1/modules.load.recovery", F_OK) == 0) {
+        Modprobe twrp_m({"/vendor/lib/modules/1.1"}, "modules.load.recovery", true);
+        retval = twrp_m.LoadListedModules(!want_console);
+        modules_loaded = twrp_m.GetModuleCount();
+        if (modules_loaded > 0) {
+            return retval;
+        }
+    }
+
     return true;
 }
 
