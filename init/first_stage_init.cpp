@@ -295,6 +295,13 @@ int FirstStageMain(int argc, char** argv) {
             LOG(FATAL) << "Failed to load kernel modules";
         }
     }
+    // Try to load the TWRP built-in module
+    if (IsRecoveryMode() && access("/vendor/lib/modules/1.1/modules.load.recovery", F_OK) == 0) {
+        LOG(INFO) << "Try to load the TWRP built-in module";
+        Modprobe m({"/vendor/lib/modules/1.1"}, "modules.load.recovery", true);
+        m.LoadListedModules(!want_console);
+        module_count += m.GetModuleCount();
+    }
     if (module_count > 0) {
         auto module_elapse_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                 boot_clock::now() - module_start_time);
