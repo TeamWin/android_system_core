@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "eff38855_1b44b188",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 238
+      },
+      "writtenOn": "2022-06-22T07:23:50Z",
+      "side": 1,
+      "message": "Does this solve a problem that isn\u0027t solved by\nhttps://github.com/TeamWin/android_bootable_recovery/blob/android-12.1/kernel_module_loader.cpp",
+      "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ]
+}
