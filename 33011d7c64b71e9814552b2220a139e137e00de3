@@ -16,6 +16,24 @@
       "message": "Does this solve a problem that isn\u0027t solved by\nhttps://github.com/TeamWin/android_bootable_recovery/blob/android-12.1/kernel_module_loader.cpp",
       "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "04dfa668_11064b4a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 783
+      },
+      "writtenOn": "2022-06-22T09:24:54Z",
+      "side": 1,
+      "message": "I tried kernel_module_loader and the problem persists, it runs after gui_init.\nhttps://github.com/TeamWin/android_bootable_recovery/blob/android-12.1/twrp.cpp#L414\nI don\u0027t have a better way, so fix it in first_stage_init.",
+      "parentUuid": "eff38855_1b44b188",
+      "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
