@@ -51,6 +51,24 @@
       "message": "If twrp is flashed, it will still try to load the drm module in ramdisk which can lead to mismatch problem ?",
       "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "bb5591b4_4bd6033e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 783
+      },
+      "writtenOn": "2022-06-29T12:04:11Z",
+      "side": 1,
+      "message": "IsRecoveryMode() ensures that the module is not loaded when not twrp.\nAt the same time it only tries to load the twrp module at the end. The same module will not be loaded twice.",
+      "parentUuid": "c6ae2f48_56acb87c",
+      "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
