@@ -122,6 +122,24 @@
       "parentUuid": "1df82e0a_d4797abe",
       "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ece87b47_67405a8a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 783
+      },
+      "writtenOn": "2022-06-29T13:40:07Z",
+      "side": 1,
+      "message": "I did not find that the log was printed when entering the system.\nWaiting for more tests.",
+      "parentUuid": "3db65a09_d04a88c5",
+      "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
