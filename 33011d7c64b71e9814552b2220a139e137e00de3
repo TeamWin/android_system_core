@@ -104,6 +104,24 @@
       "parentUuid": "260ec3ba_abd938f3",
       "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "3db65a09_d04a88c5",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 800
+      },
+      "writtenOn": "2022-06-29T13:10:43Z",
+      "side": 1,
+      "message": "Its a check twrp has, to determine if twrp is booted using \"fastboot boot\" or its flashed and then booted. Though I doubt that the prop will be changed on first_stage_init.",
+      "parentUuid": "1df82e0a_d4797abe",
+      "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
