@@ -86,6 +86,24 @@
       "message": "You should also check for twrpfastboot\u003d1 in cmdline",
       "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1df82e0a_d4797abe",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 783
+      },
+      "writtenOn": "2022-06-29T12:24:06Z",
+      "side": 1,
+      "message": "Why do you need to check twrpfastboot\u003d1 what does it do?",
+      "parentUuid": "260ec3ba_abd938f3",
+      "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
