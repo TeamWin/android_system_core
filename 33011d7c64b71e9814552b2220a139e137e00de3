@@ -34,6 +34,23 @@
       "parentUuid": "eff38855_1b44b188",
       "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c6ae2f48_56acb87c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 800
+      },
+      "writtenOn": "2022-06-29T11:23:17Z",
+      "side": 1,
+      "message": "If twrp is flashed, it will still try to load the drm module in ramdisk which can lead to mismatch problem ?",
+      "revId": "33011d7c64b71e9814552b2220a139e137e00de3",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
