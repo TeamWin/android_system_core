@@ -774,11 +774,7 @@ bool fs_mgr_set_blk_ro(const std::string& blockdev, bool readonly) {
 // Orange state means the device is unlocked, see the following link for details.
 // https://source.android.com/security/verifiedboot/verified-boot#device_state
 bool fs_mgr_is_device_unlocked() {
-    std::string verified_boot_state;
-    if (fs_mgr_get_boot_config("verifiedbootstate", &verified_boot_state)) {
-        return verified_boot_state == "orange";
-    }
-    return false;
+    return true;
 }
 
 // __mount(): wrapper around the mount() system call which also

@@ -107,12 +107,7 @@ bool WaitForFile(const std::string& filename, const std::chrono::milliseconds re
 }
 
 bool IsDeviceUnlocked() {
-    std::string verified_boot_state;
-
-    if (fs_mgr_get_boot_config("verifiedbootstate", &verified_boot_state)) {
-        return verified_boot_state == "orange";
-    }
-    return false;
+    return true;
 }
 
 bool SetBlockDeviceReadOnly(const std::string& blockdev) {
