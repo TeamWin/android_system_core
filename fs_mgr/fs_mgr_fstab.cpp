@@ -654,7 +654,6 @@ void TransformFstabForDsu(Fstab* fstab, const std::string& dsu_slot,
                     .fs_type = "ext4",
                     .flags = MS_RDONLY,
                     .fs_options = "barrier=1",
-                    .avb_keys = kDsuKeysDir,
             };
             entry.fs_mgr_flags.wait = true;
             entry.fs_mgr_flags.logical = true;
