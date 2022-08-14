@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "82753dff_137cd7b3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1
+      },
+      "writtenOn": "2022-08-14T16:57:11Z",
+      "side": 1,
+      "message": "I feel like this should be opt in to cut down on potential issues.",
+      "revId": "119b0b2b238b0f6bfc751cee8b391764260fd251",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ]
+}
