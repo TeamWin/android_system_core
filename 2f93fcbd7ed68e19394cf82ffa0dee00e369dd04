@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0f4752c9_e37d3be9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1
+      },
+      "writtenOn": "2022-08-21T21:03:42Z",
+      "side": 1,
+      "message": "Can this patchset check to see if the RW flag is set in fstab for the block device before skipping?",
+      "revId": "2f93fcbd7ed68e19394cf82ffa0dee00e369dd04",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ]
+}
