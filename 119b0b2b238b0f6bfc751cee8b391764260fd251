@@ -16,6 +16,24 @@
       "message": "I feel like this should be opt in to cut down on potential issues.",
       "revId": "119b0b2b238b0f6bfc751cee8b391764260fd251",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9f2ce9c2_c01ad350",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 938
+      },
+      "writtenOn": "2022-08-27T13:35:03Z",
+      "side": 1,
+      "message": "I have this commit on my ROM trees too, and I build with this commit included for both Retrofit Dynamic Partitions devices and Native Dynamic Partitions Devices, Nothing seem to be wrong so far",
+      "parentUuid": "82753dff_137cd7b3",
+      "revId": "119b0b2b238b0f6bfc751cee8b391764260fd251",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
