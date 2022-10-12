@@ -16,6 +16,41 @@
       "message": "What conflict does this resolve?",
       "revId": "16c5750c3efb837b1d7de4884de0205bba1ce033",
       "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d35d7c03_3f53b562",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 938
+      },
+      "writtenOn": "2022-10-12T21:03:16Z",
+      "side": 1,
+      "message": "It was exactly this symbol getting conflict, I didn\u0027t manage to find where\u0027s another symbol located at, I\u0027m not familiar with assembly lanuage at all, but doing this really made the compilation pass, that\u0027s why I\u0027m not giving this patch +1",
+      "parentUuid": "8674855f_3f9093a9",
+      "revId": "16c5750c3efb837b1d7de4884de0205bba1ce033",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5798a603_09a9f86e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 938
+      },
+      "writtenOn": "2022-10-12T21:03:16Z",
+      "side": 1,
+      "message": "It was the ",
+      "revId": "16c5750c3efb837b1d7de4884de0205bba1ce033",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
     }
   ]
 }
