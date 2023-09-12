@@ -104,7 +104,7 @@ cc_defaults {
         "liblogwrap",
         "libdm",
         "libext2_uuid",
-        "libfscrypt",
+        "libfscrypttwrp",
         "libfstab",
     ],
     cppflags: [
