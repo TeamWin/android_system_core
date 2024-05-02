@@ -216,6 +216,7 @@ cc_library {
         },
         android_x86: {
             srcs: [
+                "arch-x86/__x86.get_pc_thunk.S",
                 "arch-x86/android_memset16.S",
                 "arch-x86/android_memset32.S",
             ],
