@@ -1,4 +1,22 @@
 {
-  "comments": [],
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "941c96f2_8f2c6e76",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1321
+      },
+      "writtenOn": "2024-09-03T07:55:19Z",
+      "side": 1,
+      "message": "fastbootd: Always assume device is unlocked\n\nChange-Id: Ia4134bdfc554e0d4e67f2ddf1194b28dc28460c2",
+      "revId": "46741326a77b39f6d677eb9e1f23cf2a339dcfcd",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ],
   "submitRequirementResults": []
 }
