@@ -104,6 +104,7 @@ cc_library_headers {
 
 cc_library_static {
     name: "libsnapshot",
+    recovery_available: true,
     defaults: [
         "libsnapshot_defaults",
         "libsnapshot_hal_deps",
