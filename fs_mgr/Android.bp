@@ -58,6 +58,7 @@ cc_defaults {
 
 cc_defaults {
     name: "libfs_mgr_defaults",
+    recovery_available: true,
     defaults: ["fs_mgr_defaults"],
     export_include_dirs: ["include"],
     include_dirs: ["system/vold"],
