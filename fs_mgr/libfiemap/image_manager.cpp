@@ -274,8 +274,12 @@ bool ImageManager::DeleteBackingImage(const std::string& name) {
     }
 
     if (device_info_.is_recovery.value()) {
-        LOG(ERROR) << "Cannot remove images backed by /data in recovery";
-        return false;
+        if (android::base::GetProperty("ro.crypto.state", "") == "encrypted") {
+            if (android::base::GetProperty("twrp.decrypt.done", "") != "true") {
+                LOG(ERROR) << "Cannot remove images backed by /data if data is encrypted";
+                return false;
+            }
+        }
     }
 
     std::string message;
