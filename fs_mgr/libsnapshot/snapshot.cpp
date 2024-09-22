@@ -761,9 +761,11 @@ bool SnapshotManager::DeleteSnapshot(LockedFile* lock, const std::string& name) 
     // We can't delete snapshots in recovery. The only way we'd try is it we're
     // completing or canceling a merge in preparation for a data wipe, in which
     // case, we don't care if the file sticks around.
-    if (device_->IsRecovery()) {
-        LOG(INFO) << "Skipping delete of snapshot " << name << " in recovery.";
-        return true;
+    if (android::base::GetProperty("ro.crypto.state", "") == "encrypted") {
+        if (android::base::GetProperty("twrp.decrypt.done", "") != "true") {
+            LOG(INFO) << "Skipping delete of snapshot " << name << " in recovery because data is encrypted.";
+            return true;
+        }
     }
 
     auto cow_image_name = GetCowImageDeviceName(name);
