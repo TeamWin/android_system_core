@@ -233,15 +233,8 @@ cc_defaults {
     target: {
         recovery: {
             cflags: ["-DRECOVERY"],
-            exclude_static_libs: [
-                "libxml2",
-            ],
             exclude_generated_sources: [
                 "apex-info-list",
-            ],
-            exclude_shared_libs: [
-                "libbinder",
-                "libutils",
             ],
         },
     },
@@ -250,6 +243,9 @@ cc_defaults {
 cc_library_static {
     name: "libinit",
     defaults: ["libinit_defaults"],
+    visibility: [
+        "//bootable/recovery:__subpackages__",
+    ],
 }
 
 cc_library_static {
