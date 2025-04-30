@@ -1,4 +1,28 @@
 {
-  "comments": [],
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ab34237b_89906f4e",
+        "filename": "fs_mgr/libsnapshot/Android.bp",
+        "patchSetId": 2
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 1485
+      },
+      "writtenOn": "2025-04-30T18:43:08Z",
+      "side": 1,
+      "message": "Either we update recovery dependency for libsnapshot or add libsnapshot_static dependency for minadbd! otherwise will not compile successfully.",
+      "range": {
+        "startLine": 105,
+        "startChar": 4,
+        "endLine": 105,
+        "endChar": 29
+      },
+      "revId": "61a04eb0d5ee630215deafeb2514f98b8258d0c0",
+      "serverId": "9c1c7d72-6534-4d44-b0ea-39f63e804833"
+    }
+  ],
   "submitRequirementResults": []
 }
