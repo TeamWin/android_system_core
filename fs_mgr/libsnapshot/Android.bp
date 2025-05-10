@@ -115,6 +115,7 @@ cc_library_static {
 
 cc_library {
     name: "libsnapshot",
+    recovery_available: true,
     defaults: [
         "libsnapshot_defaults",
         "libsnapshot_cow_defaults",
