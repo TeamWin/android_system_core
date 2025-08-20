@@ -411,42 +411,12 @@ bool RebootFastbootHandler(FastbootDevice* device, const std::vector<std::string
     return result;
 }
 
-static bool EnterRecovery() {
-    const char msg_switch_to_recovery = 'r';
-
-    android::base::unique_fd sock(socket(AF_UNIX, SOCK_STREAM, 0));
-    if (sock < 0) {
-        PLOG(ERROR) << "Couldn't create sock";
-        return false;
-    }
-
-    struct sockaddr_un addr = {.sun_family = AF_UNIX};
-    strncpy(addr.sun_path, "/dev/socket/recovery", sizeof(addr.sun_path) - 1);
-    if (connect(sock.get(), (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        PLOG(ERROR) << "Couldn't connect to recovery";
-        return false;
-    }
-    // Switch to recovery will not update the boot reason since it does not
-    // require a reboot.
-    auto ret = write(sock.get(), &msg_switch_to_recovery, sizeof(msg_switch_to_recovery));
-    if (ret != sizeof(msg_switch_to_recovery)) {
-        PLOG(ERROR) << "Couldn't write message to switch to recovery";
-        return false;
-    }
-
-    return true;
-}
-
 bool RebootRecoveryHandler(FastbootDevice* device, const std::vector<std::string>& /* args */) {
-    auto status = true;
-    if (EnterRecovery()) {
-        status = device->WriteStatus(FastbootResult::OKAY, "Rebooting to recovery");
-    } else {
-        status = device->WriteStatus(FastbootResult::FAIL, "Unable to reboot to recovery");
-    }
+    auto result = device->WriteStatus(FastbootResult::OKAY, "Rebooting to recovery");
+    android::base::SetProperty(ANDROID_RB_PROPERTY, "reboot,recovery");
     device->CloseDevice();
     TEMP_FAILURE_RETRY(pause());
-    return status;
+    return result;
 }
 
 // Helper class for opening a handle to a MetadataBuilder and writing the new
