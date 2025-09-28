@@ -180,3 +180,4 @@ if [[ $(check_type compopt) == "builtin" ]]; then
 else
     complete -o nospace -F _fastboot fastboot
 fi
+
